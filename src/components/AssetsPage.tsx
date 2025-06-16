@@ -6,12 +6,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { useCompanyData } from '@/hooks/useCompanyData';
+import { useAssetsData } from '@/hooks/useAssetsData';
+import { usePeopleData } from '@/hooks/usePeopleData';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { Laptop, Plus, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function AssetsPage() {
-  const { assets, people, addAsset, assignAsset } = useCompanyData();
+  const { assets, loading: assetsLoading, refreshData } = useAssetsData();
+  const { people, loading: peopleLoading } = usePeopleData();
+  const { currentOrganization } = useCurrentOrganization();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -22,41 +27,59 @@ export default function AssetsPage() {
     personId: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const loading = assetsLoading || peopleLoading;
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.brand || !formData.value) {
+    if (!formData.name || !formData.brand || !formData.value || !currentOrganization) {
       toast({
         title: "Erro",
-        description: "Nome, marca e valor são obrigatórios",
+        description: "Nome, marca, valor são obrigatórios",
         variant: "destructive",
       });
       return;
     }
 
-    const newAsset = addAsset({
-      name: formData.name,
-      serialNumber: formData.serialNumber || undefined,
-      brand: formData.brand,
-      value: parseFloat(formData.value),
-      organizationId: 'default',
-      personId: formData.personId || undefined,
-      assignedAt: formData.personId ? new Date() : undefined,
-    });
+    try {
+      const assetData = {
+        name: formData.name,
+        serial_number: formData.serialNumber || null,
+        brand: formData.brand,
+        value: parseFloat(formData.value),
+        organization_id: currentOrganization.id,
+        person_id: formData.personId || null,
+        assigned_at: formData.personId ? new Date().toISOString() : null,
+      };
 
-    setFormData({
-      name: '',
-      serialNumber: '',
-      brand: '',
-      value: '',
-      personId: '',
-    });
-    setIsDialogOpen(false);
-    
-    toast({
-      title: "Sucesso",
-      description: "Ativo adicionado com sucesso",
-    });
+      const { error } = await supabase
+        .from('assets')
+        .insert(assetData);
+
+      if (error) throw error;
+
+      setFormData({
+        name: '',
+        serialNumber: '',
+        brand: '',
+        value: '',
+        personId: '',
+      });
+      setIsDialogOpen(false);
+      refreshData();
+      
+      toast({
+        title: "Sucesso",
+        description: "Ativo adicionado com sucesso",
+      });
+    } catch (error) {
+      console.error('Error adding asset:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao adicionar ativo",
+        variant: "destructive",
+      });
+    }
   };
 
   const getPersonName = (id: string) => {
@@ -64,13 +87,43 @@ export default function AssetsPage() {
     return person ? person.name : 'N/A';
   };
 
-  const handleAssignAsset = (assetId: string, personId: string) => {
-    assignAsset(assetId, personId);
-    toast({
-      title: "Sucesso",
-      description: "Ativo atribuído com sucesso",
-    });
+  const handleAssignAsset = async (assetId: string, personId: string) => {
+    try {
+      const { error } = await supabase
+        .from('assets')
+        .update({
+          person_id: personId,
+          assigned_at: new Date().toISOString(),
+        })
+        .eq('id', assetId);
+
+      if (error) throw error;
+
+      refreshData();
+      toast({
+        title: "Sucesso",
+        description: "Ativo atribuído com sucesso",
+      });
+    } catch (error) {
+      console.error('Error assigning asset:', error);
+      toast({
+        title: "Erro",
+        description: "Falha ao atribuir ativo",
+        variant: "destructive",
+      });
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Gestão de Ativos</h1>
+          <p className="text-gray-500 mt-2">Carregando ativos...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

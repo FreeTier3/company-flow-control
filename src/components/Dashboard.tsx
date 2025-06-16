@@ -1,46 +1,61 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useCompanyData } from '@/hooks/useCompanyData';
+import { usePeopleData } from '@/hooks/usePeopleData';
+import { useTeamsData } from '@/hooks/useTeamsData';
+import { useAssetsData } from '@/hooks/useAssetsData';
+import { useLicensesData } from '@/hooks/useLicensesData';
 import { Users, User, Laptop, File, Database, Calendar } from 'lucide-react';
 
 export default function Dashboard() {
-  const { getDashboardStats, people, teams, licenses, assets } = useCompanyData();
-  const stats = getDashboardStats();
+  const { people, loading: peopleLoading } = usePeopleData();
+  const { teams, loading: teamsLoading } = useTeamsData();
+  const { assets, loading: assetsLoading } = useAssetsData();
+  const { licenses, seats, loading: licensesLoading } = useLicensesData();
+
+  const loading = peopleLoading || teamsLoading || assetsLoading || licensesLoading;
+
+  // Calculate dashboard stats
+  const totalPeople = people.length;
+  const totalTeams = teams.length;
+  const totalAssets = assets.length;
+  const totalLicenses = licenses.length;
+  const availableSeats = seats.filter(seat => !seat.personId).length;
+  const assignedAssets = assets.filter(asset => asset.personId).length;
 
   const statCards = [
     {
       title: 'Total de Pessoas',
-      value: stats.totalPeople,
+      value: totalPeople,
       icon: Users,
       color: 'bg-blue-500',
     },
     {
       title: 'Times',
-      value: stats.totalTeams,
+      value: totalTeams,
       icon: User,
       color: 'bg-green-500',
     },
     {
       title: 'Ativos',
-      value: stats.totalAssets,
+      value: totalAssets,
       icon: Laptop,
       color: 'bg-purple-500',
     },
     {
       title: 'Licenças',
-      value: stats.totalLicenses,
+      value: totalLicenses,
       icon: File,
       color: 'bg-orange-500',
     },
     {
       title: 'Seats Disponíveis',
-      value: stats.availableSeats,
+      value: availableSeats,
       icon: Database,
       color: 'bg-cyan-500',
     },
     {
       title: 'Ativos Atribuídos',
-      value: stats.assignedAssets,
+      value: assignedAssets,
       icon: Calendar,
       color: 'bg-pink-500',
     },
@@ -48,6 +63,17 @@ export default function Dashboard() {
 
   const recentPeople = people.slice(-5);
   const recentAssets = assets.slice(-5);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-500 mt-2">Carregando dados da organização...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
