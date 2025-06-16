@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Team } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 export interface DatabaseTeam {
   id: string;
@@ -17,10 +18,7 @@ export function useTeamsData() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-
-  const getCurrentOrganizationId = () => {
-    return localStorage.getItem('currentOrganizationId') || '00000000-0000-0000-0000-000000000001';
-  };
+  const { currentOrganization } = useCurrentOrganization();
 
   const mapDatabaseTeamToTeam = (dbTeam: DatabaseTeam): Team => ({
     id: dbTeam.id,
@@ -31,15 +29,16 @@ export function useTeamsData() {
     updatedAt: new Date(dbTeam.updated_at)
   });
 
-  const fetchTeams = async (organizationId?: string) => {
+  const fetchTeams = async () => {
+    if (!currentOrganization?.id) return;
+    
     try {
-      const orgId = organizationId || getCurrentOrganizationId();
-      console.log('Teams: Fetching for organization:', orgId);
+      console.log('Teams: Fetching for organization:', currentOrganization.id);
       
       const { data, error } = await supabase
         .from('teams')
         .select('*')
-        .eq('organization_id', orgId)
+        .eq('organization_id', currentOrganization.id)
         .order('name');
 
       if (error) throw error;
@@ -171,13 +170,17 @@ export function useTeamsData() {
       setLoading(false);
     };
 
-    loadData();
+    if (currentOrganization?.id) {
+      loadData();
+    }
+  }, [currentOrganization?.id]);
 
+  useEffect(() => {
     // Escutar mudanças de organização
     const handleOrganizationChange = (event: CustomEvent) => {
       const { organizationId } = event.detail;
       console.log('Teams data: Organization changed to:', organizationId);
-      fetchTeams(organizationId);
+      fetchTeams();
     };
 
     window.addEventListener('organizationChanged', handleOrganizationChange as EventListener);
@@ -185,7 +188,7 @@ export function useTeamsData() {
     return () => {
       window.removeEventListener('organizationChanged', handleOrganizationChange as EventListener);
     };
-  }, []);
+  }, [currentOrganization?.id]);
 
   return {
     teams,

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { License, Seat } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 export interface DatabaseLicense {
   id: string;
@@ -28,10 +29,7 @@ export function useLicensesData() {
   const [seats, setSeats] = useState<Seat[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-
-  const getCurrentOrganizationId = () => {
-    return localStorage.getItem('currentOrganizationId') || '00000000-0000-0000-0000-000000000001';
-  };
+  const { currentOrganization } = useCurrentOrganization();
 
   const mapDatabaseLicenseToLicense = (dbLicense: DatabaseLicense): License => ({
     id: dbLicense.id,
@@ -53,15 +51,16 @@ export function useLicensesData() {
     updatedAt: new Date(dbSeat.updated_at)
   });
 
-  const fetchLicenses = async (organizationId?: string) => {
+  const fetchLicenses = async () => {
+    if (!currentOrganization?.id) return;
+    
     try {
-      const orgId = organizationId || getCurrentOrganizationId();
-      console.log('Licenses: Fetching for organization:', orgId);
+      console.log('Licenses: Fetching for organization:', currentOrganization.id);
       
       const { data, error } = await supabase
         .from('licenses')
         .select('*')
-        .eq('organization_id', orgId)
+        .eq('organization_id', currentOrganization.id)
         .order('name');
 
       if (error) throw error;
@@ -79,10 +78,11 @@ export function useLicensesData() {
     }
   };
 
-  const fetchSeats = async (organizationId?: string) => {
+  const fetchSeats = async () => {
+    if (!currentOrganization?.id) return;
+    
     try {
-      const orgId = organizationId || getCurrentOrganizationId();
-      console.log('Seats: Fetching for organization:', orgId);
+      console.log('Seats: Fetching for organization:', currentOrganization.id);
       
       // Buscar apenas assentos das licenças da organização atual
       const { data, error } = await supabase
@@ -91,7 +91,7 @@ export function useLicensesData() {
           *,
           licenses!inner(organization_id)
         `)
-        .eq('licenses.organization_id', orgId)
+        .eq('licenses.organization_id', currentOrganization.id)
         .order('created_at');
 
       if (error) throw error;
@@ -334,14 +334,18 @@ export function useLicensesData() {
       setLoading(false);
     };
 
-    loadData();
+    if (currentOrganization?.id) {
+      loadData();
+    }
+  }, [currentOrganization?.id]);
 
+  useEffect(() => {
     // Escutar mudanças de organização
     const handleOrganizationChange = (event: CustomEvent) => {
       const { organizationId } = event.detail;
       console.log('Licenses data: Organization changed to:', organizationId);
-      fetchLicenses(organizationId);
-      fetchSeats(organizationId);
+      fetchLicenses();
+      fetchSeats();
     };
 
     window.addEventListener('organizationChanged', handleOrganizationChange as EventListener);
@@ -349,7 +353,7 @@ export function useLicensesData() {
     return () => {
       window.removeEventListener('organizationChanged', handleOrganizationChange as EventListener);
     };
-  }, []);
+  }, [currentOrganization?.id]);
 
   return {
     licenses,

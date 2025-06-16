@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Asset } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 export interface DatabaseAsset {
   id: string;
@@ -21,10 +22,7 @@ export function useAssetsData() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-
-  const getCurrentOrganizationId = () => {
-    return localStorage.getItem('currentOrganizationId') || '00000000-0000-0000-0000-000000000001';
-  };
+  const { currentOrganization } = useCurrentOrganization();
 
   const mapDatabaseAssetToAsset = (dbAsset: DatabaseAsset): Asset => ({
     id: dbAsset.id,
@@ -39,15 +37,16 @@ export function useAssetsData() {
     updatedAt: new Date(dbAsset.updated_at)
   });
 
-  const fetchAssets = async (organizationId?: string) => {
+  const fetchAssets = async () => {
+    if (!currentOrganization?.id) return;
+    
     try {
-      const orgId = organizationId || getCurrentOrganizationId();
-      console.log('Assets: Fetching for organization:', orgId);
+      console.log('Assets: Fetching for organization:', currentOrganization.id);
       
       const { data, error } = await supabase
         .from('assets')
         .select('*')
-        .eq('organization_id', orgId)
+        .eq('organization_id', currentOrganization.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -72,13 +71,17 @@ export function useAssetsData() {
       setLoading(false);
     };
 
-    loadData();
+    if (currentOrganization?.id) {
+      loadData();
+    }
+  }, [currentOrganization?.id]);
 
+  useEffect(() => {
     // Escutar mudanças de organização
     const handleOrganizationChange = (event: CustomEvent) => {
       const { organizationId } = event.detail;
       console.log('Assets data: Organization changed to:', organizationId);
-      fetchAssets(organizationId);
+      fetchAssets();
     };
 
     window.addEventListener('organizationChanged', handleOrganizationChange as EventListener);
@@ -86,7 +89,7 @@ export function useAssetsData() {
     return () => {
       window.removeEventListener('organizationChanged', handleOrganizationChange as EventListener);
     };
-  }, []);
+  }, [currentOrganization?.id]);
 
   return {
     assets,

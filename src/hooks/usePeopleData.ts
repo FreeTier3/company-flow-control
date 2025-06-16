@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Person, Team } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 export interface DatabasePerson {
   id: string;
@@ -29,10 +30,7 @@ export function usePeopleData() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-
-  const getCurrentOrganizationId = () => {
-    return localStorage.getItem('currentOrganizationId') || '00000000-0000-0000-0000-000000000001';
-  };
+  const { currentOrganization } = useCurrentOrganization();
 
   const mapDatabasePersonToPerson = (dbPerson: DatabasePerson): Person => ({
     id: dbPerson.id,
@@ -55,15 +53,16 @@ export function usePeopleData() {
     updatedAt: new Date(dbTeam.updated_at)
   });
 
-  const fetchPeople = async (organizationId?: string) => {
+  const fetchPeople = async () => {
+    if (!currentOrganization?.id) return;
+    
     try {
-      const orgId = organizationId || getCurrentOrganizationId();
-      console.log('People: Fetching for organization:', orgId);
+      console.log('People: Fetching for organization:', currentOrganization.id);
       
       const { data, error } = await supabase
         .from('people')
         .select('*')
-        .eq('organization_id', orgId)
+        .eq('organization_id', currentOrganization.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -81,15 +80,16 @@ export function usePeopleData() {
     }
   };
 
-  const fetchTeams = async (organizationId?: string) => {
+  const fetchTeams = async () => {
+    if (!currentOrganization?.id) return;
+    
     try {
-      const orgId = organizationId || getCurrentOrganizationId();
-      console.log('People Hook: Fetching teams for organization:', orgId);
+      console.log('People Hook: Fetching teams for organization:', currentOrganization.id);
       
       const { data, error } = await supabase
         .from('teams')
         .select('*')
-        .eq('organization_id', orgId)
+        .eq('organization_id', currentOrganization.id)
         .order('name');
 
       if (error) throw error;
@@ -227,14 +227,18 @@ export function usePeopleData() {
       setLoading(false);
     };
 
-    loadData();
+    if (currentOrganization?.id) {
+      loadData();
+    }
+  }, [currentOrganization?.id]);
 
+  useEffect(() => {
     // Escutar mudanças de organização
     const handleOrganizationChange = (event: CustomEvent) => {
       const { organizationId } = event.detail;
       console.log('People data: Organization changed to:', organizationId);
-      fetchPeople(organizationId);
-      fetchTeams(organizationId);
+      fetchPeople();
+      fetchTeams();
     };
 
     window.addEventListener('organizationChanged', handleOrganizationChange as EventListener);
@@ -242,7 +246,7 @@ export function usePeopleData() {
     return () => {
       window.removeEventListener('organizationChanged', handleOrganizationChange as EventListener);
     };
-  }, []);
+  }, [currentOrganization?.id]);
 
   return {
     people,

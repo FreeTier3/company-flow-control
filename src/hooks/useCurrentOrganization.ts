@@ -15,30 +15,7 @@ export function useCurrentOrganization() {
 
   const loadCurrentOrganization = async () => {
     try {
-      // Primeiro, tenta carregar a organização salva no localStorage
-      const savedOrgId = localStorage.getItem('currentOrganizationId');
-      
-      if (savedOrgId) {
-        const { data: savedOrg, error: savedOrgError } = await supabase
-          .from('organizations')
-          .select('*')
-          .eq('id', savedOrgId)
-          .single();
-
-        if (!savedOrgError && savedOrg) {
-          const mappedOrg: Organization = {
-            id: savedOrg.id,
-            name: savedOrg.name,
-            createdAt: new Date(savedOrg.created_at),
-            updatedAt: new Date(savedOrg.updated_at)
-          };
-          setCurrentOrganization(mappedOrg);
-          setLoading(false);
-          return;
-        }
-      }
-
-      // Se não há organização salva ou ela não existe mais, carrega a primeira disponível
+      // Carrega a primeira organização disponível no banco
       const { data: organizations, error } = await supabase
         .from('organizations')
         .select('*')
@@ -56,7 +33,7 @@ export function useCurrentOrganization() {
           updatedAt: new Date(org.updated_at)
         };
         setCurrentOrganization(mappedOrg);
-        localStorage.setItem('currentOrganizationId', mappedOrg.id);
+        console.log('Current organization loaded:', mappedOrg.name);
       }
     } catch (error) {
       console.error('Error loading current organization:', error);
@@ -89,7 +66,6 @@ export function useCurrentOrganization() {
       };
 
       setCurrentOrganization(mappedOrg);
-      localStorage.setItem('currentOrganizationId', mappedOrg.id);
       
       toast({
         title: "Sucesso",
