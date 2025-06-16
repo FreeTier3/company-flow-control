@@ -79,6 +79,7 @@ export function useLicensesData() {
         description: "Falha ao carregar licenças",
         variant: "destructive",
       });
+      setLicenses([]);
     }
   };
 
@@ -122,6 +123,7 @@ export function useLicensesData() {
         description: "Falha ao carregar assentos",
         variant: "destructive",
       });
+      setSeats([]);
     }
   };
 
@@ -343,6 +345,22 @@ export function useLicensesData() {
     };
 
     loadData();
+  }, [currentOrganization?.id]);
+
+  // Listen for organization changes
+  useEffect(() => {
+    const handleOrganizationChange = () => {
+      console.log('Licenses: Organization changed, refetching data');
+      const loadData = async () => {
+        setLoading(true);
+        await Promise.all([fetchLicenses(), fetchSeats()]);
+        setLoading(false);
+      };
+      loadData();
+    };
+
+    window.addEventListener('organizationChanged', handleOrganizationChange);
+    return () => window.removeEventListener('organizationChanged', handleOrganizationChange);
   }, [currentOrganization?.id]);
 
   return {

@@ -81,6 +81,7 @@ export function usePeopleData() {
         description: "Falha ao carregar pessoas",
         variant: "destructive",
       });
+      setPeople([]);
     }
   };
 
@@ -112,6 +113,7 @@ export function usePeopleData() {
         description: "Falha ao carregar times",
         variant: "destructive",
       });
+      setTeams([]);
     }
   };
 
@@ -236,6 +238,22 @@ export function usePeopleData() {
     };
 
     loadData();
+  }, [currentOrganization?.id]);
+
+  // Listen for organization changes
+  useEffect(() => {
+    const handleOrganizationChange = () => {
+      console.log('People: Organization changed, refetching data');
+      const loadData = async () => {
+        setLoading(true);
+        await Promise.all([fetchPeople(), fetchTeams()]);
+        setLoading(false);
+      };
+      loadData();
+    };
+
+    window.addEventListener('organizationChanged', handleOrganizationChange);
+    return () => window.removeEventListener('organizationChanged', handleOrganizationChange);
   }, [currentOrganization?.id]);
 
   return {

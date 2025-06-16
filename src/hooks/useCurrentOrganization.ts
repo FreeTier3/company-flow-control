@@ -15,7 +15,33 @@ export function useCurrentOrganization() {
 
   const loadCurrentOrganization = async () => {
     try {
-      // Carrega a primeira organização disponível no banco
+      // Primeiro tenta carregar a organização salva no localStorage
+      const savedOrgId = localStorage.getItem('currentOrganizationId');
+      
+      if (savedOrgId) {
+        console.log('Loading saved organization:', savedOrgId);
+        const { data: org, error } = await supabase
+          .from('organizations')
+          .select('*')
+          .eq('id', savedOrgId)
+          .single();
+
+        if (!error && org) {
+          const mappedOrg: Organization = {
+            id: org.id,
+            name: org.name,
+            createdAt: new Date(org.created_at),
+            updatedAt: new Date(org.updated_at)
+          };
+          setCurrentOrganization(mappedOrg);
+          console.log('Loaded saved organization:', mappedOrg.name);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Se não tem organização salva ou não foi encontrada, carrega a primeira disponível
+      console.log('Loading first available organization');
       const { data: organizations, error } = await supabase
         .from('organizations')
         .select('*')
@@ -33,7 +59,8 @@ export function useCurrentOrganization() {
           updatedAt: new Date(org.updated_at)
         };
         setCurrentOrganization(mappedOrg);
-        console.log('Current organization loaded:', mappedOrg.name);
+        localStorage.setItem('currentOrganizationId', mappedOrg.id);
+        console.log('Loaded first organization:', mappedOrg.name);
       }
     } catch (error) {
       console.error('Error loading current organization:', error);
@@ -65,6 +92,8 @@ export function useCurrentOrganization() {
         updatedAt: new Date(data.updated_at)
       };
 
+      // Salva a nova organização
+      localStorage.setItem('currentOrganizationId', mappedOrg.id);
       setCurrentOrganization(mappedOrg);
       
       toast({
@@ -74,8 +103,10 @@ export function useCurrentOrganization() {
 
       console.log('Organization switched to:', mappedOrg.name);
       
-      // Forçar reload da página para garantir que todos os dados sejam atualizados
-      window.location.reload();
+      // Dispara evento personalizado para forçar atualização de todos os componentes
+      window.dispatchEvent(new CustomEvent('organizationChanged', { 
+        detail: { organizationId: mappedOrg.id } 
+      }));
 
     } catch (error) {
       console.error('Error switching organization:', error);

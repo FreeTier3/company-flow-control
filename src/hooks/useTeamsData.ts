@@ -32,6 +32,7 @@ export function useTeamsData() {
     if (!currentOrganization?.id) {
       console.log('Teams: No current organization, clearing teams');
       setTeams([]);
+      setLoading(false);
       return;
     }
     
@@ -56,6 +57,9 @@ export function useTeamsData() {
         description: "Falha ao carregar times",
         variant: "destructive",
       });
+      setTeams([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -167,13 +171,18 @@ export function useTeamsData() {
   };
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await fetchTeams();
-      setLoading(false);
+    fetchTeams();
+  }, [currentOrganization?.id]);
+
+  // Listen for organization changes
+  useEffect(() => {
+    const handleOrganizationChange = () => {
+      console.log('Teams: Organization changed, refetching data');
+      fetchTeams();
     };
 
-    loadData();
+    window.addEventListener('organizationChanged', handleOrganizationChange);
+    return () => window.removeEventListener('organizationChanged', handleOrganizationChange);
   }, [currentOrganization?.id]);
 
   return {

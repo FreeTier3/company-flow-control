@@ -41,6 +41,7 @@ export function useAssetsData() {
     if (!currentOrganization?.id) {
       console.log('Assets: No current organization, clearing assets');
       setAssets([]);
+      setLoading(false);
       return;
     }
     
@@ -65,17 +66,25 @@ export function useAssetsData() {
         description: "Falha ao carregar ativos",
         variant: "destructive",
       });
+      setAssets([]);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await fetchAssets();
-      setLoading(false);
+    fetchAssets();
+  }, [currentOrganization?.id]);
+
+  // Listen for organization changes
+  useEffect(() => {
+    const handleOrganizationChange = () => {
+      console.log('Assets: Organization changed, refetching data');
+      fetchAssets();
     };
 
-    loadData();
+    window.addEventListener('organizationChanged', handleOrganizationChange);
+    return () => window.removeEventListener('organizationChanged', handleOrganizationChange);
   }, [currentOrganization?.id]);
 
   return {
