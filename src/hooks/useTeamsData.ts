@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Team } from '@/types';
@@ -33,6 +34,8 @@ export function useTeamsData() {
   const fetchTeams = async (organizationId?: string) => {
     try {
       const orgId = organizationId || getCurrentOrganizationId();
+      console.log('Teams: Fetching for organization:', orgId);
+      
       const { data, error } = await supabase
         .from('teams')
         .select('*')
@@ -42,6 +45,7 @@ export function useTeamsData() {
       if (error) throw error;
 
       const mappedTeams = data.map(mapDatabaseTeamToTeam);
+      console.log('Teams: Fetched teams:', mappedTeams.length);
       setTeams(mappedTeams);
     } catch (error) {
       console.error('Error fetching teams:', error);

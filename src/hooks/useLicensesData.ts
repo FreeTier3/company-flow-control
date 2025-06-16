@@ -29,7 +29,9 @@ export function useLicensesData() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const defaultOrganizationId = '00000000-0000-0000-0000-000000000001';
+  const getCurrentOrganizationId = () => {
+    return localStorage.getItem('currentOrganizationId') || '00000000-0000-0000-0000-000000000001';
+  };
 
   const mapDatabaseLicenseToLicense = (dbLicense: DatabaseLicense): License => ({
     id: dbLicense.id,
@@ -51,17 +53,21 @@ export function useLicensesData() {
     updatedAt: new Date(dbSeat.updated_at)
   });
 
-  const fetchLicenses = async () => {
+  const fetchLicenses = async (organizationId?: string) => {
     try {
+      const orgId = organizationId || getCurrentOrganizationId();
+      console.log('Licenses: Fetching for organization:', orgId);
+      
       const { data, error } = await supabase
         .from('licenses')
         .select('*')
-        .eq('organization_id', defaultOrganizationId)
+        .eq('organization_id', orgId)
         .order('name');
 
       if (error) throw error;
 
       const mappedLicenses = data.map(mapDatabaseLicenseToLicense);
+      console.log('Licenses: Fetched licenses:', mappedLicenses.length);
       setLicenses(mappedLicenses);
     } catch (error) {
       console.error('Error fetching licenses:', error);
@@ -73,16 +79,33 @@ export function useLicensesData() {
     }
   };
 
-  const fetchSeats = async () => {
+  const fetchSeats = async (organizationId?: string) => {
     try {
+      const orgId = organizationId || getCurrentOrganizationId();
+      console.log('Seats: Fetching for organization:', orgId);
+      
+      // Buscar apenas assentos das licenças da organização atual
       const { data, error } = await supabase
         .from('seats')
-        .select('*')
+        .select(`
+          *,
+          licenses!inner(organization_id)
+        `)
+        .eq('licenses.organization_id', orgId)
         .order('created_at');
 
       if (error) throw error;
 
-      const mappedSeats = data.map(mapDatabaseSeatToSeat);
+      const mappedSeats = data.map(seat => mapDatabaseSeatToSeat({
+        id: seat.id,
+        license_id: seat.license_id,
+        code: seat.code,
+        person_id: seat.person_id,
+        assigned_at: seat.assigned_at,
+        created_at: seat.created_at,
+        updated_at: seat.updated_at
+      }));
+      console.log('Seats: Fetched seats:', mappedSeats.length);
       setSeats(mappedSeats);
     } catch (error) {
       console.error('Error fetching seats:', error);
@@ -312,6 +335,20 @@ export function useLicensesData() {
     };
 
     loadData();
+
+    // Escutar mudanças de organização
+    const handleOrganizationChange = (event: CustomEvent) => {
+      const { organizationId } = event.detail;
+      console.log('Licenses data: Organization changed to:', organizationId);
+      fetchLicenses(organizationId);
+      fetchSeats(organizationId);
+    };
+
+    window.addEventListener('organizationChanged', handleOrganizationChange as EventListener);
+
+    return () => {
+      window.removeEventListener('organizationChanged', handleOrganizationChange as EventListener);
+    };
   }, []);
 
   return {

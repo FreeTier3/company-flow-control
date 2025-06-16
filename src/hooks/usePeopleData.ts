@@ -58,6 +58,8 @@ export function usePeopleData() {
   const fetchPeople = async (organizationId?: string) => {
     try {
       const orgId = organizationId || getCurrentOrganizationId();
+      console.log('People: Fetching for organization:', orgId);
+      
       const { data, error } = await supabase
         .from('people')
         .select('*')
@@ -67,6 +69,7 @@ export function usePeopleData() {
       if (error) throw error;
 
       const mappedPeople = data.map(mapDatabasePersonToPerson);
+      console.log('People: Fetched people:', mappedPeople.length);
       setPeople(mappedPeople);
     } catch (error) {
       console.error('Error fetching people:', error);
@@ -81,6 +84,8 @@ export function usePeopleData() {
   const fetchTeams = async (organizationId?: string) => {
     try {
       const orgId = organizationId || getCurrentOrganizationId();
+      console.log('People Hook: Fetching teams for organization:', orgId);
+      
       const { data, error } = await supabase
         .from('teams')
         .select('*')
@@ -90,6 +95,7 @@ export function usePeopleData() {
       if (error) throw error;
 
       const mappedTeams = data.map(mapDatabaseTeamToTeam);
+      console.log('People Hook: Fetched teams:', mappedTeams.length);
       setTeams(mappedTeams);
     } catch (error) {
       console.error('Error fetching teams:', error);

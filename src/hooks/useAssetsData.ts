@@ -42,6 +42,8 @@ export function useAssetsData() {
   const fetchAssets = async (organizationId?: string) => {
     try {
       const orgId = organizationId || getCurrentOrganizationId();
+      console.log('Assets: Fetching for organization:', orgId);
+      
       const { data, error } = await supabase
         .from('assets')
         .select('*')
@@ -51,6 +53,7 @@ export function useAssetsData() {
       if (error) throw error;
 
       const mappedAssets = data.map(mapDatabaseAssetToAsset);
+      console.log('Assets: Fetched assets:', mappedAssets.length);
       setAssets(mappedAssets);
     } catch (error) {
       console.error('Error fetching assets:', error);
