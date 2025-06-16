@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Users, Database, Laptop, File, User, Calendar } from 'lucide-react';
+import { Users, Database, Laptop, File, User, Calendar, Building2 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
 const sidebarItems = [
@@ -12,6 +12,7 @@ const sidebarItems = [
   { icon: User, label: 'Times', href: '/teams' },
   { icon: File, label: 'Licenças', href: '/licenses' },
   { icon: Laptop, label: 'Ativos', href: '/assets' },
+  { icon: Building2, label: 'Organizações', href: '/organizations' },
   { icon: Calendar, label: 'Documentos', href: '/documents' },
 ];
 

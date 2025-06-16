@@ -6,22 +6,26 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Building2, Plus, Edit, Trash2, RotateCcw } from 'lucide-react';
 import { useOrganizationsData } from '@/hooks/useOrganizationsData';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { Organization } from '@/types';
 import AddOrganizationDialog from './AddOrganizationDialog';
 import EditOrganizationDialog from './EditOrganizationDialog';
 import DeleteOrganizationDialog from './DeleteOrganizationDialog';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
 
 export default function OrganizationsPage() {
   const {
     organizations,
-    loading,
+    loading: organizationsLoading,
     createOrganization,
     updateOrganization,
     deleteOrganization
   } = useOrganizationsData();
 
-  const [currentOrgId, setCurrentOrgId] = useLocalStorage('currentOrganizationId', '00000000-0000-0000-0000-000000000001');
+  const {
+    currentOrganization,
+    loading: currentOrgLoading,
+    switchOrganization
+  } = useCurrentOrganization();
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -39,13 +43,10 @@ export default function OrganizationsPage() {
   };
 
   const handleSwitchOrganization = (orgId: string) => {
-    setCurrentOrgId(orgId);
-    window.location.reload(); // Recarrega a página para aplicar a mudança
+    switchOrganization(orgId);
   };
 
-  const getCurrentOrganization = () => {
-    return organizations.find(org => org.id === currentOrgId);
-  };
+  const loading = organizationsLoading || currentOrgLoading;
 
   if (loading) {
     return (
@@ -72,7 +73,7 @@ export default function OrganizationsPage() {
       </div>
 
       {/* Current Organization */}
-      {getCurrentOrganization() && (
+      {currentOrganization && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -83,9 +84,9 @@ export default function OrganizationsPage() {
           <CardContent>
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-semibold text-lg">{getCurrentOrganization()?.name}</h3>
+                <h3 className="font-semibold text-lg">{currentOrganization.name}</h3>
                 <p className="text-sm text-gray-500">
-                  Criada em {getCurrentOrganization()?.createdAt.toLocaleDateString('pt-BR')}
+                  Criada em {currentOrganization.createdAt.toLocaleDateString('pt-BR')}
                 </p>
               </div>
               <Badge variant="secondary">Ativa</Badge>
@@ -121,7 +122,7 @@ export default function OrganizationsPage() {
                   <TableRow key={organization.id}>
                     <TableCell className="font-medium">{organization.name}</TableCell>
                     <TableCell>
-                      {currentOrgId === organization.id ? (
+                      {currentOrganization?.id === organization.id ? (
                         <Badge variant="default">Ativa</Badge>
                       ) : (
                         <Badge variant="outline">Inativa</Badge>
@@ -131,7 +132,7 @@ export default function OrganizationsPage() {
                     <TableCell>{organization.updatedAt.toLocaleDateString('pt-BR')}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex gap-2 justify-end">
-                        {currentOrgId !== organization.id && (
+                        {currentOrganization?.id !== organization.id && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -152,7 +153,7 @@ export default function OrganizationsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleDelete(organization)}
-                          disabled={currentOrgId === organization.id}
+                          disabled={currentOrganization?.id === organization.id}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
