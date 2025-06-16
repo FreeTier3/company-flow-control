@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Team } from '@/types';
@@ -30,7 +29,11 @@ export function useTeamsData() {
   });
 
   const fetchTeams = async () => {
-    if (!currentOrganization?.id) return;
+    if (!currentOrganization?.id) {
+      console.log('Teams: No current organization, clearing teams');
+      setTeams([]);
+      return;
+    }
     
     try {
       console.log('Teams: Fetching for organization:', currentOrganization.id);
@@ -170,24 +173,7 @@ export function useTeamsData() {
       setLoading(false);
     };
 
-    if (currentOrganization?.id) {
-      loadData();
-    }
-  }, [currentOrganization?.id]);
-
-  useEffect(() => {
-    // Escutar mudanças de organização
-    const handleOrganizationChange = (event: CustomEvent) => {
-      const { organizationId } = event.detail;
-      console.log('Teams data: Organization changed to:', organizationId);
-      fetchTeams();
-    };
-
-    window.addEventListener('organizationChanged', handleOrganizationChange as EventListener);
-
-    return () => {
-      window.removeEventListener('organizationChanged', handleOrganizationChange as EventListener);
-    };
+    loadData();
   }, [currentOrganization?.id]);
 
   return {

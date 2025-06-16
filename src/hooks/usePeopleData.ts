@@ -54,7 +54,11 @@ export function usePeopleData() {
   });
 
   const fetchPeople = async () => {
-    if (!currentOrganization?.id) return;
+    if (!currentOrganization?.id) {
+      console.log('People: No current organization, clearing people');
+      setPeople([]);
+      return;
+    }
     
     try {
       console.log('People: Fetching for organization:', currentOrganization.id);
@@ -81,7 +85,11 @@ export function usePeopleData() {
   };
 
   const fetchTeams = async () => {
-    if (!currentOrganization?.id) return;
+    if (!currentOrganization?.id) {
+      console.log('People Hook: No current organization, clearing teams');
+      setTeams([]);
+      return;
+    }
     
     try {
       console.log('People Hook: Fetching teams for organization:', currentOrganization.id);
@@ -227,25 +235,7 @@ export function usePeopleData() {
       setLoading(false);
     };
 
-    if (currentOrganization?.id) {
-      loadData();
-    }
-  }, [currentOrganization?.id]);
-
-  useEffect(() => {
-    // Escutar mudanças de organização
-    const handleOrganizationChange = (event: CustomEvent) => {
-      const { organizationId } = event.detail;
-      console.log('People data: Organization changed to:', organizationId);
-      fetchPeople();
-      fetchTeams();
-    };
-
-    window.addEventListener('organizationChanged', handleOrganizationChange as EventListener);
-
-    return () => {
-      window.removeEventListener('organizationChanged', handleOrganizationChange as EventListener);
-    };
+    loadData();
   }, [currentOrganization?.id]);
 
   return {

@@ -74,10 +74,8 @@ export function useCurrentOrganization() {
 
       console.log('Organization switched to:', mappedOrg.name);
       
-      // Emitir evento customizado para notificar outros hooks
-      window.dispatchEvent(new CustomEvent('organizationChanged', {
-        detail: { organizationId: mappedOrg.id }
-      }));
+      // Forçar reload da página para garantir que todos os dados sejam atualizados
+      window.location.reload();
 
     } catch (error) {
       console.error('Error switching organization:', error);

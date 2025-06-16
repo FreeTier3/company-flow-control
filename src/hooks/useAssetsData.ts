@@ -38,7 +38,11 @@ export function useAssetsData() {
   });
 
   const fetchAssets = async () => {
-    if (!currentOrganization?.id) return;
+    if (!currentOrganization?.id) {
+      console.log('Assets: No current organization, clearing assets');
+      setAssets([]);
+      return;
+    }
     
     try {
       console.log('Assets: Fetching for organization:', currentOrganization.id);
@@ -71,24 +75,7 @@ export function useAssetsData() {
       setLoading(false);
     };
 
-    if (currentOrganization?.id) {
-      loadData();
-    }
-  }, [currentOrganization?.id]);
-
-  useEffect(() => {
-    // Escutar mudanças de organização
-    const handleOrganizationChange = (event: CustomEvent) => {
-      const { organizationId } = event.detail;
-      console.log('Assets data: Organization changed to:', organizationId);
-      fetchAssets();
-    };
-
-    window.addEventListener('organizationChanged', handleOrganizationChange as EventListener);
-
-    return () => {
-      window.removeEventListener('organizationChanged', handleOrganizationChange as EventListener);
-    };
+    loadData();
   }, [currentOrganization?.id]);
 
   return {

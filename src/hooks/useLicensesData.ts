@@ -52,7 +52,11 @@ export function useLicensesData() {
   });
 
   const fetchLicenses = async () => {
-    if (!currentOrganization?.id) return;
+    if (!currentOrganization?.id) {
+      console.log('Licenses: No current organization, clearing licenses');
+      setLicenses([]);
+      return;
+    }
     
     try {
       console.log('Licenses: Fetching for organization:', currentOrganization.id);
@@ -79,7 +83,11 @@ export function useLicensesData() {
   };
 
   const fetchSeats = async () => {
-    if (!currentOrganization?.id) return;
+    if (!currentOrganization?.id) {
+      console.log('Seats: No current organization, clearing seats');
+      setSeats([]);
+      return;
+    }
     
     try {
       console.log('Seats: Fetching for organization:', currentOrganization.id);
@@ -334,25 +342,7 @@ export function useLicensesData() {
       setLoading(false);
     };
 
-    if (currentOrganization?.id) {
-      loadData();
-    }
-  }, [currentOrganization?.id]);
-
-  useEffect(() => {
-    // Escutar mudanças de organização
-    const handleOrganizationChange = (event: CustomEvent) => {
-      const { organizationId } = event.detail;
-      console.log('Licenses data: Organization changed to:', organizationId);
-      fetchLicenses();
-      fetchSeats();
-    };
-
-    window.addEventListener('organizationChanged', handleOrganizationChange as EventListener);
-
-    return () => {
-      window.removeEventListener('organizationChanged', handleOrganizationChange as EventListener);
-    };
+    loadData();
   }, [currentOrganization?.id]);
 
   return {
