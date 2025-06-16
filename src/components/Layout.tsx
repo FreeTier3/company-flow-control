@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -19,11 +19,29 @@ const sidebarItems = [
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [forceUpdate, setForceUpdate] = useState(0);
   const location = useLocation();
   const { currentOrganization, loading } = useCurrentOrganization();
 
+  // Force re-render when organization changes
+  useEffect(() => {
+    const handleOrganizationChange = () => {
+      console.log('Layout: Organization changed, forcing update');
+      setForceUpdate(prev => prev + 1);
+    };
+
+    window.addEventListener('organizationChanged', handleOrganizationChange);
+    return () => window.removeEventListener('organizationChanged', handleOrganizationChange);
+  }, []);
+
+  // Force re-render when currentOrganization changes
+  useEffect(() => {
+    console.log('Layout: Current organization updated:', currentOrganization?.name);
+    setForceUpdate(prev => prev + 1);
+  }, [currentOrganization?.id, currentOrganization?.name]);
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50" key={forceUpdate}>
       {/* Sidebar */}
       <div className={cn(
         "fixed left-0 top-0 z-40 h-screen bg-white border-r border-gray-200 transition-transform duration-300",

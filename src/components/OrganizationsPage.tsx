@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -13,6 +13,8 @@ import EditOrganizationDialog from './EditOrganizationDialog';
 import DeleteOrganizationDialog from './DeleteOrganizationDialog';
 
 export default function OrganizationsPage() {
+  const [forceUpdate, setForceUpdate] = useState(0);
+  
   const {
     organizations,
     loading: organizationsLoading,
@@ -25,13 +27,32 @@ export default function OrganizationsPage() {
   const {
     currentOrganization,
     loading: currentOrgLoading,
-    switchOrganization
+    switchOrganization,
+    refreshCurrentOrganization
   } = useCurrentOrganization();
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedOrganization, setSelectedOrganization] = useState<Organization | null>(null);
+
+  // Listen for organization changes to force update
+  useEffect(() => {
+    const handleOrganizationChange = () => {
+      console.log('OrganizationsPage: Organization changed, forcing update');
+      setForceUpdate(prev => prev + 1);
+      refreshCurrentOrganization();
+    };
+
+    window.addEventListener('organizationChanged', handleOrganizationChange);
+    return () => window.removeEventListener('organizationChanged', handleOrganizationChange);
+  }, [refreshCurrentOrganization]);
+
+  // Force re-render when currentOrganization changes
+  useEffect(() => {
+    console.log('OrganizationsPage: Current organization updated:', currentOrganization?.name);
+    setForceUpdate(prev => prev + 1);
+  }, [currentOrganization?.id, currentOrganization?.name]);
 
   const handleEdit = (organization: Organization) => {
     setSelectedOrganization(organization);
@@ -57,12 +78,14 @@ export default function OrganizationsPage() {
   const handleUpdateOrganization = async (id: string, updates: { name: string }) => {
     const updatedOrg = await updateOrganization(id, updates);
     await refreshData();
+    await refreshCurrentOrganization();
     return updatedOrg;
   };
 
   const handleDeleteOrganization = async (id: string) => {
     await deleteOrganization(id);
     await refreshData();
+    await refreshCurrentOrganization();
   };
 
   const loading = organizationsLoading || currentOrgLoading;
@@ -78,7 +101,7 @@ export default function OrganizationsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" key={forceUpdate}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
