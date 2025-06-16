@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { License, Seat } from '@/types';
@@ -228,15 +227,22 @@ export function useLicensesData() {
     }
   };
 
-  const assignSeat = async (seatId: string, personId: string) => {
+  const assignSeat = async (seatId: string, personId: string, newCode?: string) => {
     try {
+      const updateData: any = {
+        person_id: personId,
+        assigned_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      // Se um novo código foi fornecido, incluí-lo na atualização
+      if (newCode !== undefined) {
+        updateData.code = newCode || null;
+      }
+
       const { data, error } = await supabase
         .from('seats')
-        .update({
-          person_id: personId,
-          assigned_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', seatId)
         .select()
         .single();

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,6 +60,10 @@ export default function LicensesPage() {
     if (deletingLicense) {
       await deleteLicense(deletingLicense.id);
     }
+  };
+
+  const handleAssignSeat = async (seatId: string, personId: string, newCode?: string) => {
+    return await assignSeat(seatId, personId, newCode);
   };
 
   if (loading) {
@@ -248,7 +251,7 @@ export default function LicensesPage() {
         seats={seats}
         isOpen={!!managingSeatsLicense}
         onClose={() => setManagingSeatsLicense(null)}
-        onAssignSeat={assignSeat}
+        onAssignSeat={handleAssignSeat}
         onUnassignSeat={unassignSeat}
       />
     </div>
