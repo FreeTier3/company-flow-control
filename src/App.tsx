@@ -8,6 +8,7 @@ import Layout from "./components/Layout";
 import Dashboard from "./components/Dashboard";
 import PeoplePage from "./components/PeoplePage";
 import TeamsPage from "./components/TeamsPage";
+import LicensesPage from "./components/LicensesPage";
 import AssetsPage from "./components/AssetsPage";
 import NotFound from "./pages/NotFound";
 
@@ -24,7 +25,7 @@ const App = () => (
             <Route index element={<Dashboard />} />
             <Route path="people" element={<PeoplePage />} />
             <Route path="teams" element={<TeamsPage />} />
-            <Route path="licenses" element={<div className="p-8 text-center text-gray-500">Página de Licenças em desenvolvimento</div>} />
+            <Route path="licenses" element={<LicensesPage />} />
             <Route path="assets" element={<AssetsPage />} />
             <Route path="documents" element={<div className="p-8 text-center text-gray-500">Página de Documentos em desenvolvimento</div>} />
           </Route>
