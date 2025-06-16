@@ -5,21 +5,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { useCompanyData } from '@/hooks/useCompanyData';
-import { User, Users, Plus } from 'lucide-react';
+import { useTeamsData } from '@/hooks/useTeamsData';
+import { usePeopleData } from '@/hooks/usePeopleData';
+import { User, Users, Plus, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
+import EditTeamDialog from '@/components/EditTeamDialog';
+import DeleteTeamDialog from '@/components/DeleteTeamDialog';
+import { Team } from '@/types';
 
 export default function TeamsPage() {
-  const { teams, people, addTeam } = useCompanyData();
+  const { teams, loading, addTeam, updateTeam, deleteTeam } = useTeamsData();
+  const { people } = usePeopleData();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editTeam, setEditTeam] = useState<Team | null>(null);
+  const [deleteTeamData, setDeleteTeamData] = useState<Team | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.name) {
@@ -31,23 +38,44 @@ export default function TeamsPage() {
       return;
     }
 
-    addTeam({
-      ...formData,
-      organizationId: 'default',
-    });
+    try {
+      await addTeam({
+        ...formData,
+        organizationId: '00000000-0000-0000-0000-000000000001',
+      });
 
-    setFormData({ name: '', description: '' });
-    setIsDialogOpen(false);
-    
-    toast({
-      title: "Sucesso",
-      description: "Time criado com sucesso",
-    });
+      setFormData({ name: '', description: '' });
+      setIsDialogOpen(false);
+    } catch (error) {
+      // Error is handled in the hook
+    }
+  };
+
+  const handleEdit = (team: Team) => {
+    setEditTeam(team);
+  };
+
+  const handleDelete = (team: Team) => {
+    setDeleteTeamData(team);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (deleteTeamData) {
+      await deleteTeam(deleteTeamData.id);
+    }
   };
 
   const getTeamMembers = (teamId: string) => {
     return people.filter(person => person.teamId === teamId);
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-64">
+        <div className="text-lg text-gray-500">Carregando times...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -108,13 +136,33 @@ export default function TeamsPage() {
           return (
             <Card key={team.id} className="corporate-card animate-fade-in" style={{ animationDelay: `${index * 0.1}s` }}>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <div className="bg-green-500 rounded-full p-2">
-                    <Users className="h-4 w-4 text-white" />
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-green-500 rounded-full p-2">
+                      <Users className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">{team.name}</h3>
+                      <p className="text-sm text-gray-500 font-normal">{members.length} membro(s)</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold">{team.name}</h3>
-                    <p className="text-sm text-gray-500 font-normal">{members.length} membro(s)</p>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEdit(team)}
+                      className="h-8 w-8"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(team)}
+                      className="h-8 w-8 text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </CardTitle>
               </CardHeader>
@@ -162,6 +210,22 @@ export default function TeamsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Edit Team Dialog */}
+      <EditTeamDialog
+        team={editTeam}
+        isOpen={!!editTeam}
+        onClose={() => setEditTeam(null)}
+        onSave={updateTeam}
+      />
+
+      {/* Delete Team Dialog */}
+      <DeleteTeamDialog
+        team={deleteTeamData}
+        isOpen={!!deleteTeamData}
+        onClose={() => setDeleteTeamData(null)}
+        onConfirm={handleDeleteConfirm}
+      />
     </div>
   );
 }
