@@ -5,20 +5,22 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Users, Database, Laptop, File, User, Calendar, Building2 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 
 const sidebarItems = [
+  { icon: Building2, label: 'Organizações', href: '/organizations' },
   { icon: Database, label: 'Dashboard', href: '/' },
   { icon: Users, label: 'Pessoas', href: '/people' },
   { icon: User, label: 'Times', href: '/teams' },
   { icon: File, label: 'Licenças', href: '/licenses' },
   { icon: Laptop, label: 'Ativos', href: '/assets' },
-  { icon: Building2, label: 'Organizações', href: '/organizations' },
   { icon: Calendar, label: 'Documentos', href: '/documents' },
 ];
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const location = useLocation();
+  const { currentOrganization, loading } = useCurrentOrganization();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -40,6 +42,24 @@ export default function Layout() {
               </div>
             )}
           </div>
+
+          {/* Current Organization */}
+          {currentOrganization && (
+            <div className="border-b border-gray-200 px-4 py-3">
+              {sidebarOpen ? (
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">Organização Atual</p>
+                  <p className="text-sm font-medium text-gray-900 mt-1">{currentOrganization.name}</p>
+                </div>
+              ) : (
+                <div className="flex justify-center">
+                  <div className="bg-blue-100 rounded-full p-1">
+                    <Building2 className="h-4 w-4 text-blue-600" />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Navigation */}
           <nav className="flex-1 space-y-1 p-4">
@@ -82,6 +102,25 @@ export default function Layout() {
         "transition-all duration-300",
         sidebarOpen ? "ml-64" : "ml-16"
       )}>
+        {/* Top Bar with Organization Info */}
+        <div className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {currentOrganization && (
+                <>
+                  <Building2 className="h-5 w-5 text-gray-500" />
+                  <span className="text-sm text-gray-600">
+                    Trabalhando em: <span className="font-medium text-gray-900">{currentOrganization.name}</span>
+                  </span>
+                </>
+              )}
+              {loading && (
+                <span className="text-sm text-gray-500">Carregando organização...</span>
+              )}
+            </div>
+          </div>
+        </div>
+
         <main className="p-6">
           <Outlet />
         </main>

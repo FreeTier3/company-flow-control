@@ -18,7 +18,8 @@ export default function OrganizationsPage() {
     loading: organizationsLoading,
     createOrganization,
     updateOrganization,
-    deleteOrganization
+    deleteOrganization,
+    refreshData
   } = useOrganizationsData();
 
   const {
@@ -42,8 +43,26 @@ export default function OrganizationsPage() {
     setIsDeleteDialogOpen(true);
   };
 
-  const handleSwitchOrganization = (orgId: string) => {
-    switchOrganization(orgId);
+  const handleSwitchOrganization = async (orgId: string) => {
+    console.log('Switching to organization:', orgId);
+    await switchOrganization(orgId);
+  };
+
+  const handleCreateOrganization = async (orgData: { name: string }) => {
+    const newOrg = await createOrganization(orgData);
+    await refreshData();
+    return newOrg;
+  };
+
+  const handleUpdateOrganization = async (id: string, updates: { name: string }) => {
+    const updatedOrg = await updateOrganization(id, updates);
+    await refreshData();
+    return updatedOrg;
+  };
+
+  const handleDeleteOrganization = async (id: string) => {
+    await deleteOrganization(id);
+    await refreshData();
   };
 
   const loading = organizationsLoading || currentOrgLoading;
@@ -59,7 +78,7 @@ export default function OrganizationsPage() {
   }
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -171,7 +190,7 @@ export default function OrganizationsPage() {
       <AddOrganizationDialog
         isOpen={isAddDialogOpen}
         onClose={() => setIsAddDialogOpen(false)}
-        onAdd={createOrganization}
+        onAdd={handleCreateOrganization}
       />
 
       <EditOrganizationDialog
@@ -181,7 +200,7 @@ export default function OrganizationsPage() {
           setIsEditDialogOpen(false);
           setSelectedOrganization(null);
         }}
-        onUpdate={updateOrganization}
+        onUpdate={handleUpdateOrganization}
       />
 
       <DeleteOrganizationDialog
@@ -191,7 +210,7 @@ export default function OrganizationsPage() {
           setIsDeleteDialogOpen(false);
           setSelectedOrganization(null);
         }}
-        onDelete={deleteOrganization}
+        onDelete={handleDeleteOrganization}
       />
     </div>
   );

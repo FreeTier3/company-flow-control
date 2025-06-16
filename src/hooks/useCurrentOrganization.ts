@@ -47,6 +47,7 @@ export function useCurrentOrganization() {
   };
 
   const switchOrganization = async (organizationId: string) => {
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('organizations')
@@ -70,8 +71,7 @@ export function useCurrentOrganization() {
         description: `Organização alterada para: ${mappedOrg.name}`,
       });
 
-      // Recarrega a página para aplicar mudanças
-      window.location.reload();
+      console.log('Organization switched to:', mappedOrg.name);
     } catch (error) {
       console.error('Error switching organization:', error);
       toast({
@@ -79,6 +79,8 @@ export function useCurrentOrganization() {
         description: "Falha ao alterar organização",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
