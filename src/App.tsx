@@ -11,6 +11,7 @@ import PersonDetailsPage from "./components/PersonDetailsPage";
 import TeamsPage from "./components/TeamsPage";
 import LicensesPage from "./components/LicensesPage";
 import AssetsPage from "./components/AssetsPage";
+import OrganizationsPage from "./components/OrganizationsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
             <Route path="teams" element={<TeamsPage />} />
             <Route path="licenses" element={<LicensesPage />} />
             <Route path="assets" element={<AssetsPage />} />
+            <Route path="organizations" element={<OrganizationsPage />} />
             <Route path="documents" element={<div className="p-8 text-center text-gray-500">Página de Documentos em desenvolvimento</div>} />
           </Route>
           <Route path="*" element={<NotFound />} />
