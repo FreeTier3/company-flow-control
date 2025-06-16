@@ -13,7 +13,7 @@ interface EditPersonDialogProps {
   teams: Team[];
   isOpen: boolean;
   onClose: () => void;
-  onSave: (id: string, updates: Partial<Person>) => Promise<void>;
+  onSave: (id: string, updates: Partial<Person>) => Promise<Person>;
 }
 
 export default function EditPersonDialog({ 
@@ -116,7 +116,7 @@ export default function EditPersonDialog({
                 <SelectValue placeholder="Selecione o superior" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Nenhum</SelectItem>
+                <SelectItem value="none">Nenhum</SelectItem>
                 {availableSuperiors.map(person => (
                   <SelectItem key={person.id} value={person.id}>
                     {person.name} - {person.position}
@@ -133,7 +133,7 @@ export default function EditPersonDialog({
                 <SelectValue placeholder="Selecione o time" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Nenhum</SelectItem>
+                <SelectItem value="none">Nenhum</SelectItem>
                 {teams.map(team => (
                   <SelectItem key={team.id} value={team.id}>
                     {team.name}
