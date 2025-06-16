@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Person, Team } from '@/types';
@@ -31,7 +30,9 @@ export function usePeopleData() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const defaultOrganizationId = '00000000-0000-0000-0000-000000000001';
+  const getCurrentOrganizationId = () => {
+    return localStorage.getItem('currentOrganizationId') || '00000000-0000-0000-0000-000000000001';
+  };
 
   const mapDatabasePersonToPerson = (dbPerson: DatabasePerson): Person => ({
     id: dbPerson.id,
@@ -54,12 +55,13 @@ export function usePeopleData() {
     updatedAt: new Date(dbTeam.updated_at)
   });
 
-  const fetchPeople = async () => {
+  const fetchPeople = async (organizationId?: string) => {
     try {
+      const orgId = organizationId || getCurrentOrganizationId();
       const { data, error } = await supabase
         .from('people')
         .select('*')
-        .eq('organization_id', defaultOrganizationId)
+        .eq('organization_id', orgId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -76,12 +78,13 @@ export function usePeopleData() {
     }
   };
 
-  const fetchTeams = async () => {
+  const fetchTeams = async (organizationId?: string) => {
     try {
+      const orgId = organizationId || getCurrentOrganizationId();
       const { data, error } = await supabase
         .from('teams')
         .select('*')
-        .eq('organization_id', defaultOrganizationId)
+        .eq('organization_id', orgId)
         .order('name');
 
       if (error) throw error;
@@ -219,6 +222,20 @@ export function usePeopleData() {
     };
 
     loadData();
+
+    // Escutar mudanças de organização
+    const handleOrganizationChange = (event: CustomEvent) => {
+      const { organizationId } = event.detail;
+      console.log('People data: Organization changed to:', organizationId);
+      fetchPeople(organizationId);
+      fetchTeams(organizationId);
+    };
+
+    window.addEventListener('organizationChanged', handleOrganizationChange as EventListener);
+
+    return () => {
+      window.removeEventListener('organizationChanged', handleOrganizationChange as EventListener);
+    };
   }, []);
 
   return {

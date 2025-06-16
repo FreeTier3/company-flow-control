@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Team } from '@/types';
@@ -18,7 +17,9 @@ export function useTeamsData() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const defaultOrganizationId = '00000000-0000-0000-0000-000000000001';
+  const getCurrentOrganizationId = () => {
+    return localStorage.getItem('currentOrganizationId') || '00000000-0000-0000-0000-000000000001';
+  };
 
   const mapDatabaseTeamToTeam = (dbTeam: DatabaseTeam): Team => ({
     id: dbTeam.id,
@@ -29,12 +30,13 @@ export function useTeamsData() {
     updatedAt: new Date(dbTeam.updated_at)
   });
 
-  const fetchTeams = async () => {
+  const fetchTeams = async (organizationId?: string) => {
     try {
+      const orgId = organizationId || getCurrentOrganizationId();
       const { data, error } = await supabase
         .from('teams')
         .select('*')
-        .eq('organization_id', defaultOrganizationId)
+        .eq('organization_id', orgId)
         .order('name');
 
       if (error) throw error;
@@ -166,6 +168,19 @@ export function useTeamsData() {
     };
 
     loadData();
+
+    // Escutar mudanças de organização
+    const handleOrganizationChange = (event: CustomEvent) => {
+      const { organizationId } = event.detail;
+      console.log('Teams data: Organization changed to:', organizationId);
+      fetchTeams(organizationId);
+    };
+
+    window.addEventListener('organizationChanged', handleOrganizationChange as EventListener);
+
+    return () => {
+      window.removeEventListener('organizationChanged', handleOrganizationChange as EventListener);
+    };
   }, []);
 
   return {

@@ -22,7 +22,9 @@ export function useAssetsData() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const defaultOrganizationId = '00000000-0000-0000-0000-000000000001';
+  const getCurrentOrganizationId = () => {
+    return localStorage.getItem('currentOrganizationId') || '00000000-0000-0000-0000-000000000001';
+  };
 
   const mapDatabaseAssetToAsset = (dbAsset: DatabaseAsset): Asset => ({
     id: dbAsset.id,
@@ -37,12 +39,13 @@ export function useAssetsData() {
     updatedAt: new Date(dbAsset.updated_at)
   });
 
-  const fetchAssets = async () => {
+  const fetchAssets = async (organizationId?: string) => {
     try {
+      const orgId = organizationId || getCurrentOrganizationId();
       const { data, error } = await supabase
         .from('assets')
         .select('*')
-        .eq('organization_id', defaultOrganizationId)
+        .eq('organization_id', orgId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -67,6 +70,19 @@ export function useAssetsData() {
     };
 
     loadData();
+
+    // Escutar mudanças de organização
+    const handleOrganizationChange = (event: CustomEvent) => {
+      const { organizationId } = event.detail;
+      console.log('Assets data: Organization changed to:', organizationId);
+      fetchAssets(organizationId);
+    };
+
+    window.addEventListener('organizationChanged', handleOrganizationChange as EventListener);
+
+    return () => {
+      window.removeEventListener('organizationChanged', handleOrganizationChange as EventListener);
+    };
   }, []);
 
   return {
