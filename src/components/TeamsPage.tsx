@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,14 +12,16 @@ import { Textarea } from '@/components/ui/textarea';
 import EditTeamDialog from '@/components/EditTeamDialog';
 import DeleteTeamDialog from '@/components/DeleteTeamDialog';
 import { Team } from '@/types';
+import ManageTeamMembersDialog from '@/components/ManageTeamMembersDialog';
 
 export default function TeamsPage() {
   const { teams, loading, addTeam, updateTeam, deleteTeam } = useTeamsData();
-  const { people } = usePeopleData();
+  const { people, updatePerson } = usePeopleData();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editTeam, setEditTeam] = useState<Team | null>(null);
   const [deleteTeamData, setDeleteTeamData] = useState<Team | null>(null);
+  const [manageMembersTeam, setManageMembersTeam] = useState<Team | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -67,6 +68,10 @@ export default function TeamsPage() {
 
   const getTeamMembers = (teamId: string) => {
     return people.filter(person => person.teamId === teamId);
+  };
+
+  const handleManageMembers = (team: Team) => {
+    setManageMembersTeam(team);
   };
 
   if (loading) {
@@ -134,7 +139,7 @@ export default function TeamsPage() {
         {teams.map((team, index) => {
           const members = getTeamMembers(team.id);
           return (
-            <Card key={team.id} className="corporate-card animate-fade-in" style={{ animationDelay: `${index * 0.1}s` }}>
+            <Card key={team.id} className="corporate-card animate-fade-in cursor-pointer hover:shadow-lg transition-shadow" style={{ animationDelay: `${index * 0.1}s` }}>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -150,7 +155,10 @@ export default function TeamsPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => handleEdit(team)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdit(team);
+                      }}
                       className="h-8 w-8"
                     >
                       <Edit className="h-4 w-4" />
@@ -158,7 +166,10 @@ export default function TeamsPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => handleDelete(team)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(team);
+                      }}
                       className="h-8 w-8 text-red-600 hover:text-red-700"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -166,7 +177,7 @@ export default function TeamsPage() {
                   </div>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent onClick={() => handleManageMembers(team)}>
                 <div className="space-y-3">
                   {team.description && (
                     <p className="text-sm text-gray-600">{team.description}</p>
@@ -189,6 +200,12 @@ export default function TeamsPage() {
                         )}
                       </div>
                     )}
+                  </div>
+                  
+                  <div className="pt-2 border-t">
+                    <Button variant="outline" size="sm" className="w-full">
+                      Gerenciar Membros
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -225,6 +242,15 @@ export default function TeamsPage() {
         isOpen={!!deleteTeamData}
         onClose={() => setDeleteTeamData(null)}
         onConfirm={handleDeleteConfirm}
+      />
+
+      {/* Manage Members Dialog */}
+      <ManageTeamMembersDialog
+        team={manageMembersTeam}
+        isOpen={!!manageMembersTeam}
+        onClose={() => setManageMembersTeam(null)}
+        people={people}
+        onUpdatePerson={updatePerson}
       />
     </div>
   );

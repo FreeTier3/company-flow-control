@@ -1,109 +1,110 @@
 
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePeopleData } from '@/hooks/usePeopleData';
-import { Person } from '@/types';
-import { Users, User, Plus, Edit, Trash2, Loader2 } from 'lucide-react';
+import { User, Plus, Edit, Trash2, Mail, Users, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import EditPersonDialog from './EditPersonDialog';
-import DeletePersonDialog from './DeletePersonDialog';
+import EditPersonDialog from '@/components/EditPersonDialog';
+import DeletePersonDialog from '@/components/DeletePersonDialog';
+import { Person } from '@/types';
 
 export default function PeoplePage() {
+  const navigate = useNavigate();
   const { people, teams, loading, addPerson, updatePerson, deletePerson } = usePeopleData();
   const { toast } = useToast();
-  
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
-  const [adding, setAdding] = useState(false);
-  
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editPerson, setEditPerson] = useState<Person | null>(null);
+  const [deletePersonData, setDeletePersonData] = useState<Person | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterTeam, setFilterTeam] = useState<string>('all');
   const [formData, setFormData] = useState({
-    name: '',
     email: '',
+    name: '',
     position: '',
     reportsTo: '',
     teamId: '',
   });
 
-  const defaultOrganizationId = '00000000-0000-0000-0000-000000000001';
+  const filteredPeople = people.filter(person => {
+    const matchesSearch = person.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         person.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         person.position.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesTeam = filterTeam === 'all' || 
+                       (filterTeam === 'no-team' && !person.teamId) ||
+                       person.teamId === filterTeam;
+    
+    return matchesSearch && matchesTeam;
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name || !formData.email || !formData.position) {
+    if (!formData.email || !formData.name || !formData.position) {
       toast({
         title: "Erro",
-        description: "Nome, email e cargo são obrigatórios",
+        description: "Email, nome e cargo são obrigatórios",
         variant: "destructive",
       });
       return;
     }
 
-    setAdding(true);
     try {
       await addPerson({
         ...formData,
-        organizationId: defaultOrganizationId,
         reportsTo: formData.reportsTo || undefined,
         teamId: formData.teamId || undefined,
+        organizationId: '00000000-0000-0000-0000-000000000001',
       });
 
-      setFormData({
-        name: '',
-        email: '',
-        position: '',
-        reportsTo: '',
-        teamId: '',
-      });
-      setIsAddDialogOpen(false);
+      setFormData({ email: '', name: '', position: '', reportsTo: '', teamId: '' });
+      setIsDialogOpen(false);
     } catch (error) {
       // Error is handled in the hook
-    } finally {
-      setAdding(false);
     }
   };
 
   const handleEdit = (person: Person) => {
-    setSelectedPerson(person);
-    setIsEditDialogOpen(true);
+    setEditPerson(person);
   };
 
   const handleDelete = (person: Person) => {
-    setSelectedPerson(person);
-    setIsDeleteDialogOpen(true);
+    setDeletePersonData(person);
   };
 
   const handleDeleteConfirm = async () => {
-    if (selectedPerson) {
-      await deletePerson(selectedPerson.id);
+    if (deletePersonData) {
+      await deletePerson(deletePersonData.id);
     }
   };
 
-  const getPersonName = (id: string) => {
-    const person = people.find(p => p.id === id);
-    return person ? person.name : 'N/A';
+  const handleViewDetails = (person: Person) => {
+    navigate(`/person/${person.id}`);
   };
 
-  const getTeamName = (id: string) => {
-    const team = teams.find(t => t.id === id);
-    return team ? team.name : 'N/A';
+  const getTeamName = (teamId?: string) => {
+    if (!teamId) return null;
+    const team = teams.find(t => t.id === teamId);
+    return team?.name;
   };
 
-  const getSubordinates = (personId: string) => {
-    return people.filter(p => p.reportsTo === personId);
+  const getSuperiorName = (reportsTo?: string) => {
+    if (!reportsTo) return null;
+    const superior = people.find(p => p.id === reportsTo);
+    return superior?.name;
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
-        <span className="ml-2">Carregando pessoas...</span>
+      <div className="flex justify-center items-center min-h-64">
+        <div className="text-lg text-gray-500">Carregando pessoas...</div>
       </div>
     );
   }
@@ -114,10 +115,10 @@ export default function PeoplePage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Gestão de Pessoas</h1>
-          <p className="text-gray-500 mt-2">Gerencie funcionários e hierarquia organizacional</p>
+          <p className="text-gray-500 mt-2">Gerencie colaboradores da organização</p>
         </div>
         
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button className="corporate-button">
               <Plus className="h-4 w-4 mr-2" />
@@ -130,17 +131,6 @@ export default function PeoplePage() {
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="name">Nome *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Nome completo"
-                  required
-                />
-              </div>
-              
-              <div>
                 <Label htmlFor="email">Email *</Label>
                 <Input
                   id="email"
@@ -148,7 +138,16 @@ export default function PeoplePage() {
                   value={formData.email}
                   onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                   placeholder="email@empresa.com"
-                  required
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="name">Nome *</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Nome completo"
                 />
               </div>
               
@@ -158,55 +157,43 @@ export default function PeoplePage() {
                   id="position"
                   value={formData.position}
                   onChange={(e) => setFormData(prev => ({ ...prev, position: e.target.value }))}
-                  placeholder="Desenvolvedor, Gerente, etc."
-                  required
+                  placeholder="Ex: Desenvolvedor, Gerente"
                 />
-              </div>
-              
-              <div>
-                <Label htmlFor="reportsTo">Reporta para</Label>
-                <Select value={formData.reportsTo} onValueChange={(value) => setFormData(prev => ({ ...prev, reportsTo: value }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o superior" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {people.map(person => (
-                      <SelectItem key={person.id} value={person.id}>
-                        {person.name} - {person.position}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
               
               <div>
                 <Label htmlFor="team">Time</Label>
                 <Select value={formData.teamId} onValueChange={(value) => setFormData(prev => ({ ...prev, teamId: value }))}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione o time" />
+                    <SelectValue placeholder="Selecione um time (opcional)" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">Nenhum time</SelectItem>
                     {teams.map(team => (
-                      <SelectItem key={team.id} value={team.id}>
-                        {team.name}
-                      </SelectItem>
+                      <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="reportsTo">Reporta para</Label>
+                <Select value={formData.reportsTo} onValueChange={(value) => setFormData(prev => ({ ...prev, reportsTo: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione superior (opcional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Nenhum superior</SelectItem>
+                    {people.map(person => (
+                      <SelectItem key={person.id} value={person.id}>{person.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               
               <div className="flex gap-2 pt-4">
-                <Button type="submit" className="flex-1" disabled={adding}>
-                  {adding ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Adicionando...
-                    </>
-                  ) : (
-                    'Adicionar'
-                  )}
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={adding}>
+                <Button type="submit" className="flex-1">Adicionar</Button>
+                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Cancelar
                 </Button>
               </div>
@@ -215,84 +202,117 @@ export default function PeoplePage() {
         </Dialog>
       </div>
 
+      {/* Filters */}
+      <div className="flex gap-4 items-center">
+        <div className="flex-1">
+          <Input
+            placeholder="Buscar por nome, email ou cargo..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <Select value={filterTeam} onValueChange={setFilterTeam}>
+          <SelectTrigger className="w-48">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os times</SelectItem>
+            <SelectItem value="no-team">Sem time</SelectItem>
+            {teams.map(team => (
+              <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* People List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {people.map((person, index) => (
-          <Card key={person.id} className="corporate-card animate-fade-in" style={{ animationDelay: `${index * 0.1}s` }}>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="bg-primary rounded-full p-2">
-                    <User className="h-4 w-4 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">{person.name}</h3>
-                    <p className="text-sm text-gray-500 font-normal">{person.position}</p>
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleEdit(person)}
-                    className="h-8 w-8 p-0"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete(person)}
-                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div>
-                  <span className="text-sm font-medium text-gray-600">Email:</span>
-                  <p className="text-sm">{person.email}</p>
-                </div>
-                
-                {person.reportsTo && (
-                  <div>
-                    <span className="text-sm font-medium text-gray-600">Reporta para:</span>
-                    <p className="text-sm">{getPersonName(person.reportsTo)}</p>
-                  </div>
-                )}
-                
-                {person.teamId && (
-                  <div>
-                    <span className="text-sm font-medium text-gray-600">Time:</span>
-                    <p className="text-sm">{getTeamName(person.teamId)}</p>
-                  </div>
-                )}
-                
-                {getSubordinates(person.id).length > 0 && (
-                  <div>
-                    <span className="text-sm font-medium text-gray-600">Subordinados:</span>
-                    <div className="flex items-center gap-1 mt-1">
-                      <Users className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm">{getSubordinates(person.id).length} pessoa(s)</span>
+      <div className="grid grid-cols-1 gap-4">
+        {filteredPeople.map((person, index) => {
+          const teamName = getTeamName(person.teamId);
+          const superiorName = getSuperiorName(person.reportsTo);
+          
+          return (
+            <Card key={person.id} className="corporate-card animate-fade-in" style={{ animationDelay: `${index * 0.05}s` }}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-blue-500 rounded-full p-3">
+                      <User className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-lg font-semibold text-gray-900">{person.name}</h3>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewDetails(person)}
+                          className="text-blue-600 hover:text-blue-700"
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Ver Detalhes
+                        </Button>
+                      </div>
+                      <p className="text-gray-600 mb-2">{person.position}</p>
+                      <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+                        <Mail className="h-4 w-4" />
+                        <span>{person.email}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        {teamName && (
+                          <Badge variant="secondary">
+                            <Users className="h-3 w-3 mr-1" />
+                            {teamName}
+                          </Badge>
+                        )}
+                        {superiorName && (
+                          <Badge variant="outline">
+                            Reporta para: {superiorName}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEdit(person)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(person)}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
+
+      {filteredPeople.length === 0 && people.length > 0 && (
+        <Card className="corporate-card">
+          <CardContent className="text-center py-12">
+            <User className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma pessoa encontrada</h3>
+            <p className="text-gray-500">Tente ajustar os filtros de busca</p>
+          </CardContent>
+        </Card>
+      )}
 
       {people.length === 0 && (
         <Card className="corporate-card">
           <CardContent className="text-center py-12">
-            <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <User className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma pessoa cadastrada</h3>
-            <p className="text-gray-500 mb-4">Comece adicionando pessoas à sua organização</p>
-            <Button onClick={() => setIsAddDialogOpen(true)} className="corporate-button">
+            <p className="text-gray-500 mb-4">Comece adicionando colaboradores à organização</p>
+            <Button onClick={() => setIsDialogOpen(true)} className="corporate-button">
               <Plus className="h-4 w-4 mr-2" />
               Adicionar Primeira Pessoa
             </Button>
@@ -300,27 +320,21 @@ export default function PeoplePage() {
         </Card>
       )}
 
-      {/* Edit Dialog */}
+      {/* Edit Person Dialog */}
       <EditPersonDialog
-        person={selectedPerson}
-        people={people}
-        teams={teams}
-        isOpen={isEditDialogOpen}
-        onClose={() => {
-          setIsEditDialogOpen(false);
-          setSelectedPerson(null);
-        }}
+        person={editPerson}
+        isOpen={!!editPerson}
+        onClose={() => setEditPerson(null)}
         onSave={updatePerson}
+        teams={teams}
+        people={people}
       />
 
-      {/* Delete Dialog */}
+      {/* Delete Person Dialog */}
       <DeletePersonDialog
-        person={selectedPerson}
-        isOpen={isDeleteDialogOpen}
-        onClose={() => {
-          setIsDeleteDialogOpen(false);
-          setSelectedPerson(null);
-        }}
+        person={deletePersonData}
+        isOpen={!!deletePersonData}
+        onClose={() => setDeletePersonData(null)}
         onConfirm={handleDeleteConfirm}
       />
     </div>
