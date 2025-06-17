@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+
 import { supabase } from '@/integrations/supabase/client';
 import { Team } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useCachedData } from '@/hooks/useCachedData';
+import { useCallback } from 'react';
 
 export interface DatabaseTeam {
   id: string;
@@ -14,8 +16,6 @@ export interface DatabaseTeam {
 }
 
 export function useTeamsData() {
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { currentOrganization } = useCurrentOrganization();
 
@@ -28,12 +28,10 @@ export function useTeamsData() {
     updatedAt: new Date(dbTeam.updated_at)
   });
 
-  const fetchTeams = async () => {
+  const fetchTeams = useCallback(async (): Promise<Team[]> => {
     if (!currentOrganization?.id) {
-      console.log('Teams: No current organization, clearing teams');
-      setTeams([]);
-      setLoading(false);
-      return;
+      console.log('Teams: No current organization, returning empty array');
+      return [];
     }
     
     try {
@@ -49,7 +47,7 @@ export function useTeamsData() {
 
       const mappedTeams = data.map(mapDatabaseTeamToTeam);
       console.log('Teams: Fetched teams:', mappedTeams.length);
-      setTeams(mappedTeams);
+      return mappedTeams;
     } catch (error) {
       console.error('Error fetching teams:', error);
       toast({
@@ -57,11 +55,24 @@ export function useTeamsData() {
         description: "Falha ao carregar times",
         variant: "destructive",
       });
-      setTeams([]);
-    } finally {
-      setLoading(false);
+      return [];
     }
-  };
+  }, [currentOrganization?.id, toast]);
+
+  const {
+    data: teams,
+    loading,
+    error,
+    refreshData,
+    invalidateCache
+  } = useCachedData(
+    fetchTeams,
+    {
+      key: `teams-${currentOrganization?.id || 'no-org'}`,
+      ttl: 15 // 15 minutes cache
+    },
+    [currentOrganization?.id]
+  );
 
   const addTeam = async (teamData: Omit<Team, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
@@ -77,15 +88,16 @@ export function useTeamsData() {
 
       if (error) throw error;
 
-      const newTeam = mapDatabaseTeamToTeam(data);
-      setTeams(prev => [newTeam, ...prev]);
+      // Invalidate cache to force refresh
+      invalidateCache();
+      refreshData();
       
       toast({
         title: "Sucesso",
         description: "Time adicionado com sucesso",
       });
 
-      return newTeam;
+      return mapDatabaseTeamToTeam(data);
     } catch (error: any) {
       console.error('Error adding team:', error);
       
@@ -118,15 +130,16 @@ export function useTeamsData() {
 
       if (error) throw error;
 
-      const updatedTeam = mapDatabaseTeamToTeam(data);
-      setTeams(prev => prev.map(team => team.id === id ? updatedTeam : team));
+      // Invalidate cache to force refresh
+      invalidateCache();
+      refreshData();
       
       toast({
         title: "Sucesso",
         description: "Time atualizado com sucesso",
       });
 
-      return updatedTeam;
+      return mapDatabaseTeamToTeam(data);
     } catch (error: any) {
       console.error('Error updating team:', error);
       
@@ -153,7 +166,9 @@ export function useTeamsData() {
 
       if (error) throw error;
 
-      setTeams(prev => prev.filter(team => team.id !== id));
+      // Invalidate cache to force refresh
+      invalidateCache();
+      refreshData();
       
       toast({
         title: "Sucesso",
@@ -170,27 +185,14 @@ export function useTeamsData() {
     }
   };
 
-  useEffect(() => {
-    fetchTeams();
-  }, [currentOrganization?.id]);
-
-  // Listen for organization changes
-  useEffect(() => {
-    const handleOrganizationChange = () => {
-      console.log('Teams: Organization changed, refetching data');
-      fetchTeams();
-    };
-
-    window.addEventListener('organizationChanged', handleOrganizationChange);
-    return () => window.removeEventListener('organizationChanged', handleOrganizationChange);
-  }, [currentOrganization?.id]);
-
   return {
-    teams,
+    teams: teams || [],
     loading,
+    error,
     addTeam,
     updateTeam,
     deleteTeam,
-    refreshData: fetchTeams
+    refreshData,
+    invalidateCache
   };
 }

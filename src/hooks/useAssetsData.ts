@@ -1,9 +1,10 @@
 
-import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Asset } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useCachedData } from '@/hooks/useCachedData';
+import { useCallback } from 'react';
 
 export interface DatabaseAsset {
   id: string;
@@ -19,8 +20,6 @@ export interface DatabaseAsset {
 }
 
 export function useAssetsData() {
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { currentOrganization } = useCurrentOrganization();
 
@@ -37,12 +36,10 @@ export function useAssetsData() {
     updatedAt: new Date(dbAsset.updated_at)
   });
 
-  const fetchAssets = async () => {
+  const fetchAssets = useCallback(async (): Promise<Asset[]> => {
     if (!currentOrganization?.id) {
-      console.log('Assets: No current organization, clearing assets');
-      setAssets([]);
-      setLoading(false);
-      return;
+      console.log('Assets: No current organization, returning empty array');
+      return [];
     }
     
     try {
@@ -58,7 +55,7 @@ export function useAssetsData() {
 
       const mappedAssets = data.map(mapDatabaseAssetToAsset);
       console.log('Assets: Fetched assets:', mappedAssets.length);
-      setAssets(mappedAssets);
+      return mappedAssets;
     } catch (error) {
       console.error('Error fetching assets:', error);
       toast({
@@ -66,30 +63,30 @@ export function useAssetsData() {
         description: "Falha ao carregar ativos",
         variant: "destructive",
       });
-      setAssets([]);
-    } finally {
-      setLoading(false);
+      return [];
     }
-  };
+  }, [currentOrganization?.id, toast]);
 
-  useEffect(() => {
-    fetchAssets();
-  }, [currentOrganization?.id]);
-
-  // Listen for organization changes
-  useEffect(() => {
-    const handleOrganizationChange = () => {
-      console.log('Assets: Organization changed, refetching data');
-      fetchAssets();
-    };
-
-    window.addEventListener('organizationChanged', handleOrganizationChange);
-    return () => window.removeEventListener('organizationChanged', handleOrganizationChange);
-  }, [currentOrganization?.id]);
+  const {
+    data: assets,
+    loading,
+    error,
+    refreshData,
+    invalidateCache
+  } = useCachedData(
+    fetchAssets,
+    {
+      key: `assets-${currentOrganization?.id || 'no-org'}`,
+      ttl: 10 // 10 minutes cache
+    },
+    [currentOrganization?.id]
+  );
 
   return {
-    assets,
+    assets: assets || [],
     loading,
-    refreshData: fetchAssets
+    error,
+    refreshData,
+    invalidateCache
   };
 }

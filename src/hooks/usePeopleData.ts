@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+
 import { supabase } from '@/integrations/supabase/client';
 import { Person, Team } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useCachedData } from '@/hooks/useCachedData';
+import { useCallback } from 'react';
 
 export interface DatabasePerson {
   id: string;
@@ -26,9 +28,6 @@ export interface DatabaseTeam {
 }
 
 export function usePeopleData() {
-  const [people, setPeople] = useState<Person[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { currentOrganization } = useCurrentOrganization();
 
@@ -53,11 +52,10 @@ export function usePeopleData() {
     updatedAt: new Date(dbTeam.updated_at)
   });
 
-  const fetchPeople = async () => {
+  const fetchPeople = useCallback(async (): Promise<Person[]> => {
     if (!currentOrganization?.id) {
-      console.log('People: No current organization, clearing people');
-      setPeople([]);
-      return;
+      console.log('People: No current organization, returning empty array');
+      return [];
     }
     
     try {
@@ -73,7 +71,7 @@ export function usePeopleData() {
 
       const mappedPeople = data.map(mapDatabasePersonToPerson);
       console.log('People: Fetched people:', mappedPeople.length);
-      setPeople(mappedPeople);
+      return mappedPeople;
     } catch (error) {
       console.error('Error fetching people:', error);
       toast({
@@ -81,15 +79,14 @@ export function usePeopleData() {
         description: "Falha ao carregar pessoas",
         variant: "destructive",
       });
-      setPeople([]);
+      return [];
     }
-  };
+  }, [currentOrganization?.id, toast]);
 
-  const fetchTeams = async () => {
+  const fetchTeams = useCallback(async (): Promise<Team[]> => {
     if (!currentOrganization?.id) {
-      console.log('People Hook: No current organization, clearing teams');
-      setTeams([]);
-      return;
+      console.log('People Hook: No current organization, returning empty array');
+      return [];
     }
     
     try {
@@ -105,7 +102,7 @@ export function usePeopleData() {
 
       const mappedTeams = data.map(mapDatabaseTeamToTeam);
       console.log('People Hook: Fetched teams:', mappedTeams.length);
-      setTeams(mappedTeams);
+      return mappedTeams;
     } catch (error) {
       console.error('Error fetching teams:', error);
       toast({
@@ -113,9 +110,39 @@ export function usePeopleData() {
         description: "Falha ao carregar times",
         variant: "destructive",
       });
-      setTeams([]);
+      return [];
     }
-  };
+  }, [currentOrganization?.id, toast]);
+
+  const {
+    data: people,
+    loading: peopleLoading,
+    error: peopleError,
+    refreshData: refreshPeople,
+    invalidateCache: invalidatePeopleCache
+  } = useCachedData(
+    fetchPeople,
+    {
+      key: `people-${currentOrganization?.id || 'no-org'}`,
+      ttl: 10 // 10 minutes cache
+    },
+    [currentOrganization?.id]
+  );
+
+  const {
+    data: teams,
+    loading: teamsLoading,
+    error: teamsError,
+    refreshData: refreshTeams,
+    invalidateCache: invalidateTeamsCache
+  } = useCachedData(
+    fetchTeams,
+    {
+      key: `people-teams-${currentOrganization?.id || 'no-org'}`,
+      ttl: 15 // 15 minutes cache
+    },
+    [currentOrganization?.id]
+  );
 
   const addPerson = async (personData: Omit<Person, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
@@ -134,15 +161,16 @@ export function usePeopleData() {
 
       if (error) throw error;
 
-      const newPerson = mapDatabasePersonToPerson(data);
-      setPeople(prev => [newPerson, ...prev]);
+      // Invalidate cache to force refresh
+      invalidatePeopleCache();
+      refreshPeople();
       
       toast({
         title: "Sucesso",
         description: "Pessoa adicionada com sucesso",
       });
 
-      return newPerson;
+      return mapDatabasePersonToPerson(data);
     } catch (error: any) {
       console.error('Error adding person:', error);
       
@@ -178,15 +206,16 @@ export function usePeopleData() {
 
       if (error) throw error;
 
-      const updatedPerson = mapDatabasePersonToPerson(data);
-      setPeople(prev => prev.map(person => person.id === id ? updatedPerson : person));
+      // Invalidate cache to force refresh
+      invalidatePeopleCache();
+      refreshPeople();
       
       toast({
         title: "Sucesso",
         description: "Pessoa atualizada com sucesso",
       });
 
-      return updatedPerson;
+      return mapDatabasePersonToPerson(data);
     } catch (error: any) {
       console.error('Error updating person:', error);
       
@@ -213,7 +242,9 @@ export function usePeopleData() {
 
       if (error) throw error;
 
-      setPeople(prev => prev.filter(person => person.id !== id));
+      // Invalidate cache to force refresh
+      invalidatePeopleCache();
+      refreshPeople();
       
       toast({
         title: "Sucesso",
@@ -230,39 +261,21 @@ export function usePeopleData() {
     }
   };
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await Promise.all([fetchPeople(), fetchTeams()]);
-      setLoading(false);
-    };
-
-    loadData();
-  }, [currentOrganization?.id]);
-
-  // Listen for organization changes
-  useEffect(() => {
-    const handleOrganizationChange = () => {
-      console.log('People: Organization changed, refetching data');
-      const loadData = async () => {
-        setLoading(true);
-        await Promise.all([fetchPeople(), fetchTeams()]);
-        setLoading(false);
-      };
-      loadData();
-    };
-
-    window.addEventListener('organizationChanged', handleOrganizationChange);
-    return () => window.removeEventListener('organizationChanged', handleOrganizationChange);
-  }, [currentOrganization?.id]);
-
   return {
-    people,
-    teams,
-    loading,
+    people: people || [],
+    teams: teams || [],
+    loading: peopleLoading || teamsLoading,
+    error: peopleError || teamsError,
     addPerson,
     updatePerson,
     deletePerson,
-    refreshData: () => Promise.all([fetchPeople(), fetchTeams()])
+    refreshData: () => {
+      refreshPeople();
+      refreshTeams();
+    },
+    invalidateCache: () => {
+      invalidatePeopleCache();
+      invalidateTeamsCache();
+    }
   };
 }

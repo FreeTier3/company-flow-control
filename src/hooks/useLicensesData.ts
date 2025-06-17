@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+
 import { supabase } from '@/integrations/supabase/client';
 import { License, Seat } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
+import { useCachedData } from '@/hooks/useCachedData';
+import { useCallback } from 'react';
 
 export interface DatabaseLicense {
   id: string;
@@ -25,9 +27,6 @@ export interface DatabaseSeat {
 }
 
 export function useLicensesData() {
-  const [licenses, setLicenses] = useState<License[]>([]);
-  const [seats, setSeats] = useState<Seat[]>([]);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { currentOrganization } = useCurrentOrganization();
 
@@ -51,11 +50,10 @@ export function useLicensesData() {
     updatedAt: new Date(dbSeat.updated_at)
   });
 
-  const fetchLicenses = async () => {
+  const fetchLicenses = useCallback(async (): Promise<License[]> => {
     if (!currentOrganization?.id) {
-      console.log('Licenses: No current organization, clearing licenses');
-      setLicenses([]);
-      return;
+      console.log('Licenses: No current organization, returning empty array');
+      return [];
     }
     
     try {
@@ -71,7 +69,7 @@ export function useLicensesData() {
 
       const mappedLicenses = data.map(mapDatabaseLicenseToLicense);
       console.log('Licenses: Fetched licenses:', mappedLicenses.length);
-      setLicenses(mappedLicenses);
+      return mappedLicenses;
     } catch (error) {
       console.error('Error fetching licenses:', error);
       toast({
@@ -79,15 +77,14 @@ export function useLicensesData() {
         description: "Falha ao carregar licenças",
         variant: "destructive",
       });
-      setLicenses([]);
+      return [];
     }
-  };
+  }, [currentOrganization?.id, toast]);
 
-  const fetchSeats = async () => {
+  const fetchSeats = useCallback(async (): Promise<Seat[]> => {
     if (!currentOrganization?.id) {
-      console.log('Seats: No current organization, clearing seats');
-      setSeats([]);
-      return;
+      console.log('Seats: No current organization, returning empty array');
+      return [];
     }
     
     try {
@@ -115,7 +112,7 @@ export function useLicensesData() {
         updated_at: seat.updated_at
       }));
       console.log('Seats: Fetched seats:', mappedSeats.length);
-      setSeats(mappedSeats);
+      return mappedSeats;
     } catch (error) {
       console.error('Error fetching seats:', error);
       toast({
@@ -123,9 +120,39 @@ export function useLicensesData() {
         description: "Falha ao carregar assentos",
         variant: "destructive",
       });
-      setSeats([]);
+      return [];
     }
-  };
+  }, [currentOrganization?.id, toast]);
+
+  const {
+    data: licenses,
+    loading: licensesLoading,
+    error: licensesError,
+    refreshData: refreshLicenses,
+    invalidateCache: invalidateLicensesCache
+  } = useCachedData(
+    fetchLicenses,
+    {
+      key: `licenses-${currentOrganization?.id || 'no-org'}`,
+      ttl: 15 // 15 minutes cache
+    },
+    [currentOrganization?.id]
+  );
+
+  const {
+    data: seats,
+    loading: seatsLoading,
+    error: seatsError,
+    refreshData: refreshSeats,
+    invalidateCache: invalidateSeatsCache
+  } = useCachedData(
+    fetchSeats,
+    {
+      key: `seats-${currentOrganization?.id || 'no-org'}`,
+      ttl: 10 // 10 minutes cache
+    },
+    [currentOrganization?.id]
+  );
 
   const addLicense = async (licenseData: Omit<License, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
@@ -156,8 +183,11 @@ export function useLicensesData() {
 
       if (seatsError) throw seatsError;
 
-      setLicenses(prev => [newLicense, ...prev]);
-      await fetchSeats(); // Recarregar assentos
+      // Invalidate cache to force refresh
+      invalidateLicensesCache();
+      invalidateSeatsCache();
+      refreshLicenses();
+      refreshSeats();
       
       toast({
         title: "Sucesso",
@@ -198,15 +228,16 @@ export function useLicensesData() {
 
       if (error) throw error;
 
-      const updatedLicense = mapDatabaseLicenseToLicense(data);
-      setLicenses(prev => prev.map(license => license.id === id ? updatedLicense : license));
+      // Invalidate cache to force refresh
+      invalidateLicensesCache();
+      refreshLicenses();
       
       toast({
         title: "Sucesso",
         description: "Licença atualizada com sucesso",
       });
 
-      return updatedLicense;
+      return mapDatabaseLicenseToLicense(data);
     } catch (error: any) {
       console.error('Error updating license:', error);
       
@@ -242,8 +273,11 @@ export function useLicensesData() {
 
       if (error) throw error;
 
-      setLicenses(prev => prev.filter(license => license.id !== id));
-      setSeats(prev => prev.filter(seat => seat.licenseId !== id));
+      // Invalidate cache to force refresh
+      invalidateLicensesCache();
+      invalidateSeatsCache();
+      refreshLicenses();
+      refreshSeats();
       
       toast({
         title: "Sucesso",
@@ -282,15 +316,16 @@ export function useLicensesData() {
 
       if (error) throw error;
 
-      const updatedSeat = mapDatabaseSeatToSeat(data);
-      setSeats(prev => prev.map(seat => seat.id === seatId ? updatedSeat : seat));
+      // Invalidate cache to force refresh
+      invalidateSeatsCache();
+      refreshSeats();
       
       toast({
         title: "Sucesso",
         description: "Assento atribuído com sucesso",
       });
 
-      return updatedSeat;
+      return mapDatabaseSeatToSeat(data);
     } catch (error) {
       console.error('Error assigning seat:', error);
       toast({
@@ -317,15 +352,16 @@ export function useLicensesData() {
 
       if (error) throw error;
 
-      const updatedSeat = mapDatabaseSeatToSeat(data);
-      setSeats(prev => prev.map(seat => seat.id === seatId ? updatedSeat : seat));
+      // Invalidate cache to force refresh
+      invalidateSeatsCache();
+      refreshSeats();
       
       toast({
         title: "Sucesso",
         description: "Assento liberado com sucesso",
       });
 
-      return updatedSeat;
+      return mapDatabaseSeatToSeat(data);
     } catch (error) {
       console.error('Error unassigning seat:', error);
       toast({
@@ -337,41 +373,23 @@ export function useLicensesData() {
     }
   };
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await Promise.all([fetchLicenses(), fetchSeats()]);
-      setLoading(false);
-    };
-
-    loadData();
-  }, [currentOrganization?.id]);
-
-  // Listen for organization changes
-  useEffect(() => {
-    const handleOrganizationChange = () => {
-      console.log('Licenses: Organization changed, refetching data');
-      const loadData = async () => {
-        setLoading(true);
-        await Promise.all([fetchLicenses(), fetchSeats()]);
-        setLoading(false);
-      };
-      loadData();
-    };
-
-    window.addEventListener('organizationChanged', handleOrganizationChange);
-    return () => window.removeEventListener('organizationChanged', handleOrganizationChange);
-  }, [currentOrganization?.id]);
-
   return {
-    licenses,
-    seats,
-    loading,
+    licenses: licenses || [],
+    seats: seats || [],
+    loading: licensesLoading || seatsLoading,
+    error: licensesError || seatsError,
     addLicense,
     updateLicense,
     deleteLicense,
     assignSeat,
     unassignSeat,
-    refreshData: () => Promise.all([fetchLicenses(), fetchSeats()])
+    refreshData: () => {
+      refreshLicenses();
+      refreshSeats();
+    },
+    invalidateCache: () => {
+      invalidateLicensesCache();
+      invalidateSeatsCache();
+    }
   };
 }
