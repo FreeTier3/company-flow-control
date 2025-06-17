@@ -12,6 +12,7 @@ import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { Laptop, Plus, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { ListSkeleton } from './ListSkeleton';
 
 export default function AssetsPage() {
   const { assets, loading: assetsLoading, refreshData } = useAssetsData();
@@ -116,12 +117,12 @@ export default function AssetsPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Gestão de Ativos</h1>
-          <p className="text-gray-500 mt-2">Carregando ativos...</p>
-        </div>
-      </div>
+      <ListSkeleton 
+        title="Gestão de Ativos"
+        subtitle="Controle equipamentos e bens da empresa"
+        itemCount={6}
+        showGrid={true}
+      />
     );
   }
 

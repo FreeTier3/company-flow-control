@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import EditTeamDialog from '@/components/EditTeamDialog';
 import DeleteTeamDialog from '@/components/DeleteTeamDialog';
 import { Team } from '@/types';
 import ManageTeamMembersDialog from '@/components/ManageTeamMembersDialog';
+import { ListSkeleton } from './ListSkeleton';
 
 export default function TeamsPage() {
   const { teams, loading, addTeam, updateTeam, deleteTeam } = useTeamsData();
@@ -76,9 +78,12 @@ export default function TeamsPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-64">
-        <div className="text-lg text-gray-500">Carregando times...</div>
-      </div>
+      <ListSkeleton 
+        title="Gestão de Times"
+        subtitle="Organize pessoas em times de trabalho"
+        itemCount={6}
+        showGrid={true}
+      />
     );
   }
 

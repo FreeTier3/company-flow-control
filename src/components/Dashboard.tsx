@@ -4,9 +4,12 @@ import { usePeopleData } from '@/hooks/usePeopleData';
 import { useTeamsData } from '@/hooks/useTeamsData';
 import { useAssetsData } from '@/hooks/useAssetsData';
 import { useLicensesData } from '@/hooks/useLicensesData';
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
 import { Users, User, Laptop, File, Database, Calendar } from 'lucide-react';
+import { DashboardSkeleton } from './DashboardSkeleton';
 
 export default function Dashboard() {
+  const { currentOrganization } = useCurrentOrganization();
   const { people, loading: peopleLoading } = usePeopleData();
   const { teams, loading: teamsLoading } = useTeamsData();
   const { assets, loading: assetsLoading } = useAssetsData();
@@ -64,15 +67,9 @@ export default function Dashboard() {
   const recentPeople = people.slice(-5);
   const recentAssets = assets.slice(-5);
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-500 mt-2">Carregando dados da organização...</p>
-        </div>
-      </div>
-    );
+  // Show skeleton while loading or if no organization is selected
+  if (loading || !currentOrganization) {
+    return <DashboardSkeleton />;
   }
 
   return (
