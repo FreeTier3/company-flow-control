@@ -1,388 +1,86 @@
 
-import { supabase } from '@/integrations/supabase/client';
-import { License, Seat } from '@/types';
-import { useToast } from '@/hooks/use-toast';
-import { useCurrentOrganization } from '@/hooks/useCurrentOrganization';
-import { useCachedData } from '@/hooks/useCachedData';
-import { useCallback } from 'react';
-
-export interface DatabaseLicense {
-  id: string;
-  name: string;
-  description: string | null;
-  total_seats: number;
-  organization_id: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface DatabaseSeat {
-  id: string;
-  license_id: string;
-  code: string | null;
-  person_id: string | null;
-  assigned_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
+import { useLicensesFetch } from '@/hooks/useLicensesFetch';
+import { useSeatsFetch } from '@/hooks/useSeatsFetch';
+import { useLicensesOperations } from '@/hooks/useLicensesOperations';
 
 export function useLicensesData() {
-  const { toast } = useToast();
-  const { currentOrganization } = useCurrentOrganization();
-
-  const mapDatabaseLicenseToLicense = (dbLicense: DatabaseLicense): License => ({
-    id: dbLicense.id,
-    name: dbLicense.name,
-    description: dbLicense.description || undefined,
-    totalSeats: dbLicense.total_seats,
-    organizationId: dbLicense.organization_id,
-    createdAt: new Date(dbLicense.created_at),
-    updatedAt: new Date(dbLicense.updated_at)
-  });
-
-  const mapDatabaseSeatToSeat = (dbSeat: DatabaseSeat): Seat => ({
-    id: dbSeat.id,
-    licenseId: dbSeat.license_id,
-    code: dbSeat.code || undefined,
-    personId: dbSeat.person_id || undefined,
-    assignedAt: dbSeat.assigned_at ? new Date(dbSeat.assigned_at) : undefined,
-    createdAt: new Date(dbSeat.created_at),
-    updatedAt: new Date(dbSeat.updated_at)
-  });
-
-  const fetchLicenses = useCallback(async (): Promise<License[]> => {
-    if (!currentOrganization?.id) {
-      console.log('Licenses: No current organization, returning empty array');
-      return [];
-    }
-    
-    try {
-      console.log('Licenses: Fetching for organization:', currentOrganization.id);
-      
-      const { data, error } = await supabase
-        .from('licenses')
-        .select('*')
-        .eq('organization_id', currentOrganization.id)
-        .order('name');
-
-      if (error) throw error;
-
-      const mappedLicenses = data.map(mapDatabaseLicenseToLicense);
-      console.log('Licenses: Fetched licenses:', mappedLicenses.length);
-      return mappedLicenses;
-    } catch (error) {
-      console.error('Error fetching licenses:', error);
-      toast({
-        title: "Erro",
-        description: "Falha ao carregar licenças",
-        variant: "destructive",
-      });
-      return [];
-    }
-  }, [currentOrganization?.id, toast]);
-
-  const fetchSeats = useCallback(async (): Promise<Seat[]> => {
-    if (!currentOrganization?.id) {
-      console.log('Seats: No current organization, returning empty array');
-      return [];
-    }
-    
-    try {
-      console.log('Seats: Fetching for organization:', currentOrganization.id);
-      
-      // Buscar apenas assentos das licenças da organização atual
-      const { data, error } = await supabase
-        .from('seats')
-        .select(`
-          *,
-          licenses!inner(organization_id)
-        `)
-        .eq('licenses.organization_id', currentOrganization.id)
-        .order('created_at');
-
-      if (error) throw error;
-
-      const mappedSeats = data.map(seat => mapDatabaseSeatToSeat({
-        id: seat.id,
-        license_id: seat.license_id,
-        code: seat.code,
-        person_id: seat.person_id,
-        assigned_at: seat.assigned_at,
-        created_at: seat.created_at,
-        updated_at: seat.updated_at
-      }));
-      console.log('Seats: Fetched seats:', mappedSeats.length);
-      return mappedSeats;
-    } catch (error) {
-      console.error('Error fetching seats:', error);
-      toast({
-        title: "Erro",
-        description: "Falha ao carregar assentos",
-        variant: "destructive",
-      });
-      return [];
-    }
-  }, [currentOrganization?.id, toast]);
-
   const {
-    data: licenses,
+    licenses,
     loading: licensesLoading,
     error: licensesError,
     refreshData: refreshLicenses,
     invalidateCache: invalidateLicensesCache
-  } = useCachedData(
-    fetchLicenses,
-    {
-      key: `licenses-${currentOrganization?.id || 'no-org'}`,
-      ttl: 15 // 15 minutes cache
-    },
-    [currentOrganization?.id]
-  );
+  } = useLicensesFetch();
 
   const {
-    data: seats,
+    seats,
     loading: seatsLoading,
     error: seatsError,
     refreshData: refreshSeats,
     invalidateCache: invalidateSeatsCache
-  } = useCachedData(
-    fetchSeats,
-    {
-      key: `seats-${currentOrganization?.id || 'no-org'}`,
-      ttl: 10 // 10 minutes cache
-    },
-    [currentOrganization?.id]
-  );
+  } = useSeatsFetch();
 
-  const addLicense = async (licenseData: Omit<License, 'id' | 'createdAt' | 'updatedAt'>) => {
-    try {
-      const { data: licenseResult, error: licenseError } = await supabase
-        .from('licenses')
-        .insert({
-          name: licenseData.name,
-          description: licenseData.description || null,
-          total_seats: licenseData.totalSeats,
-          organization_id: licenseData.organizationId
-        })
-        .select()
-        .single();
+  const { 
+    addLicense, 
+    updateLicense, 
+    deleteLicense, 
+    assignSeat, 
+    unassignSeat 
+  } = useLicensesOperations();
 
-      if (licenseError) throw licenseError;
-
-      const newLicense = mapDatabaseLicenseToLicense(licenseResult);
-
-      // Criar assentos automaticamente
-      const seatsToCreate = Array.from({ length: licenseData.totalSeats }, (_, index) => ({
-        license_id: newLicense.id,
-        code: `${licenseData.name}-${String(index + 1).padStart(3, '0')}`
-      }));
-
-      const { error: seatsError } = await supabase
-        .from('seats')
-        .insert(seatsToCreate);
-
-      if (seatsError) throw seatsError;
-
-      // Invalidate cache to force refresh
+  const handleAddLicense = async (licenseData: Parameters<typeof addLicense>[0]) => {
+    const result = await addLicense(licenseData, () => {
       invalidateLicensesCache();
       invalidateSeatsCache();
       refreshLicenses();
       refreshSeats();
-      
-      toast({
-        title: "Sucesso",
-        description: "Licença adicionada com sucesso",
-      });
-
-      return newLicense;
-    } catch (error: any) {
-      console.error('Error adding license:', error);
-      
-      let errorMessage = "Falha ao adicionar licença";
-      if (error.code === '23505') {
-        errorMessage = "Este nome de licença já está sendo usado";
-      }
-      
-      toast({
-        title: "Erro",
-        description: errorMessage,
-        variant: "destructive",
-      });
-      throw error;
-    }
+    });
+    return result;
   };
 
-  const updateLicense = async (id: string, updates: Partial<License>) => {
-    try {
-      const { data, error } = await supabase
-        .from('licenses')
-        .update({
-          ...(updates.name && { name: updates.name }),
-          description: updates.description || null,
-          ...(updates.totalSeats && { total_seats: updates.totalSeats }),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Invalidate cache to force refresh
+  const handleUpdateLicense = async (id: string, updates: Parameters<typeof updateLicense>[1]) => {
+    const result = await updateLicense(id, updates, () => {
       invalidateLicensesCache();
       refreshLicenses();
-      
-      toast({
-        title: "Sucesso",
-        description: "Licença atualizada com sucesso",
-      });
-
-      return mapDatabaseLicenseToLicense(data);
-    } catch (error: any) {
-      console.error('Error updating license:', error);
-      
-      let errorMessage = "Falha ao atualizar licença";
-      if (error.code === '23505') {
-        errorMessage = "Este nome de licença já está sendo usado";
-      }
-      
-      toast({
-        title: "Erro",
-        description: errorMessage,
-        variant: "destructive",
-      });
-      throw error;
-    }
+    });
+    return result;
   };
 
-  const deleteLicense = async (id: string) => {
-    try {
-      // Primeiro deletar os assentos
-      const { error: seatsError } = await supabase
-        .from('seats')
-        .delete()
-        .eq('license_id', id);
-
-      if (seatsError) throw seatsError;
-
-      // Depois deletar a licença
-      const { error } = await supabase
-        .from('licenses')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      // Invalidate cache to force refresh
+  const handleDeleteLicense = async (id: string) => {
+    await deleteLicense(id, () => {
       invalidateLicensesCache();
       invalidateSeatsCache();
       refreshLicenses();
       refreshSeats();
-      
-      toast({
-        title: "Sucesso",
-        description: "Licença removida com sucesso",
-      });
-    } catch (error) {
-      console.error('Error deleting license:', error);
-      toast({
-        title: "Erro",
-        description: "Falha ao remover licença",
-        variant: "destructive",
-      });
-      throw error;
-    }
+    });
   };
 
-  const assignSeat = async (seatId: string, personId: string, newCode?: string) => {
-    try {
-      const updateData: any = {
-        person_id: personId,
-        assigned_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-
-      // Se um novo código foi fornecido, incluí-lo na atualização
-      if (newCode !== undefined) {
-        updateData.code = newCode || null;
-      }
-
-      const { data, error } = await supabase
-        .from('seats')
-        .update(updateData)
-        .eq('id', seatId)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Invalidate cache to force refresh
+  const handleAssignSeat = async (seatId: string, personId: string, newCode?: string) => {
+    const result = await assignSeat(seatId, personId, newCode, () => {
       invalidateSeatsCache();
       refreshSeats();
-      
-      toast({
-        title: "Sucesso",
-        description: "Assento atribuído com sucesso",
-      });
-
-      return mapDatabaseSeatToSeat(data);
-    } catch (error) {
-      console.error('Error assigning seat:', error);
-      toast({
-        title: "Erro",
-        description: "Falha ao atribuir assento",
-        variant: "destructive",
-      });
-      throw error;
-    }
+    });
+    return result;
   };
 
-  const unassignSeat = async (seatId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('seats')
-        .update({
-          person_id: null,
-          assigned_at: null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', seatId)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Invalidate cache to force refresh
+  const handleUnassignSeat = async (seatId: string) => {
+    const result = await unassignSeat(seatId, () => {
       invalidateSeatsCache();
       refreshSeats();
-      
-      toast({
-        title: "Sucesso",
-        description: "Assento liberado com sucesso",
-      });
-
-      return mapDatabaseSeatToSeat(data);
-    } catch (error) {
-      console.error('Error unassigning seat:', error);
-      toast({
-        title: "Erro",
-        description: "Falha ao liberar assento",
-        variant: "destructive",
-      });
-      throw error;
-    }
+    });
+    return result;
   };
 
   return {
-    licenses: licenses || [],
-    seats: seats || [],
+    licenses,
+    seats,
     loading: licensesLoading || seatsLoading,
     error: licensesError || seatsError,
-    addLicense,
-    updateLicense,
-    deleteLicense,
-    assignSeat,
-    unassignSeat,
+    addLicense: handleAddLicense,
+    updateLicense: handleUpdateLicense,
+    deleteLicense: handleDeleteLicense,
+    assignSeat: handleAssignSeat,
+    unassignSeat: handleUnassignSeat,
     refreshData: () => {
       refreshLicenses();
       refreshSeats();
