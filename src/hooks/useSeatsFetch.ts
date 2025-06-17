@@ -54,6 +54,18 @@ export function useSeatsFetch() {
     }
   }, [currentOrganization?.id, toast]);
 
+  // Custom post-processing function to ensure cached data has proper Date objects
+  const postProcessCachedData = useCallback((cachedData: any[]): Seat[] => {
+    if (!Array.isArray(cachedData)) return [];
+    
+    return cachedData.map(item => ({
+      ...item,
+      assignedAt: item.assignedAt ? new Date(item.assignedAt) : undefined,
+      createdAt: new Date(item.createdAt),
+      updatedAt: new Date(item.updatedAt)
+    }));
+  }, []);
+
   const {
     data: seats,
     loading: seatsLoading,
@@ -64,7 +76,8 @@ export function useSeatsFetch() {
     fetchSeats,
     {
       key: `seats-${currentOrganization?.id || 'no-org'}`,
-      ttl: 10 // 10 minutes cache
+      ttl: 10, // 10 minutes cache
+      postProcess: postProcessCachedData
     },
     [currentOrganization?.id]
   );

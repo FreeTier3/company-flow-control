@@ -42,6 +42,17 @@ export function useLicensesFetch() {
     }
   }, [currentOrganization?.id, toast]);
 
+  // Custom post-processing function to ensure cached data has proper Date objects
+  const postProcessCachedData = useCallback((cachedData: any[]): License[] => {
+    if (!Array.isArray(cachedData)) return [];
+    
+    return cachedData.map(item => ({
+      ...item,
+      createdAt: new Date(item.createdAt),
+      updatedAt: new Date(item.updatedAt)
+    }));
+  }, []);
+
   const {
     data: licenses,
     loading: licensesLoading,
@@ -52,7 +63,8 @@ export function useLicensesFetch() {
     fetchLicenses,
     {
       key: `licenses-${currentOrganization?.id || 'no-org'}`,
-      ttl: 15 // 15 minutes cache
+      ttl: 15, // 15 minutes cache
+      postProcess: postProcessCachedData
     },
     [currentOrganization?.id]
   );

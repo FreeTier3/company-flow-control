@@ -1,21 +1,22 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-interface CacheConfig {
+interface CacheConfig<T> {
   key: string;
   ttl?: number; // Time to live em minutos, padrão 30 minutos
+  postProcess?: (data: any) => T; // Function to post-process cached data
 }
 
 export function useCachedData<T>(
   fetchFn: () => Promise<T>,
-  config: CacheConfig,
+  config: CacheConfig<T>,
   dependencies: any[] = []
 ) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  const { key, ttl = 30 } = config;
+  const { key, ttl = 30, postProcess } = config;
 
   const getCachedData = useCallback(() => {
     try {
@@ -27,7 +28,8 @@ export function useCachedData<T>(
         
         if (now < expirationTime) {
           console.log(`Cache hit for ${key}`);
-          return cachedData;
+          // Apply post-processing if provided (e.g., convert strings back to Date objects)
+          return postProcess ? postProcess(cachedData) : cachedData;
         } else {
           console.log(`Cache expired for ${key}`);
           localStorage.removeItem(key);
@@ -38,7 +40,7 @@ export function useCachedData<T>(
       localStorage.removeItem(key);
     }
     return null;
-  }, [key, ttl]);
+  }, [key, ttl, postProcess]);
 
   const setCachedData = useCallback((newData: T) => {
     try {
